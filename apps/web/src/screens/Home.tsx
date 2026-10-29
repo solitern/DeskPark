@@ -117,7 +117,9 @@ export function Home() {
   const [setup, setSetup] = useState<{ gameId: string; mode: 'local' | 'online' } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [code, setCode] = useState('');
-  const resume = GAME_UIS.map((g) => (loadSavedLocal(g.id) ? g.id : null)).find(Boolean) ?? null;
+  const [resume, setResume] = useState(
+    () => GAME_UIS.map((g) => (loadSavedLocal(g.id) ? g.id : null)).find(Boolean) ?? null,
+  );
   const resumeDef = resume ? getGame(resume) : null;
 
   const join = () => {
@@ -197,13 +199,7 @@ export function Home() {
             </span>
           </div>
           <div className="resume__actions">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                online.send({ t: 'leave' });
-              }}
-            >
+            <Button variant="ghost" size="sm" onClick={() => online.send({ t: 'leave' })}>
               离开
             </Button>
             <Button variant="primary" size="sm" onClick={() => navigate(`/room/${net.room!.code}`)}>
@@ -220,7 +216,14 @@ export function Home() {
             <span>单人对局已自动保存</span>
           </div>
           <div className="resume__actions">
-            <Button variant="ghost" size="sm" onClick={() => clearSavedLocal()}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                clearSavedLocal();
+                setResume(null);
+              }}
+            >
               放弃
             </Button>
             <Button variant="primary" size="sm" onClick={() => navigate(`/play/${resume}`)}>
