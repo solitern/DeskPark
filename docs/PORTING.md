@@ -1,5 +1,19 @@
 # App 移植方案
 
+## Android 测试包
+
+完整的环境、构建和安装步骤见 [Android APK 打包指南](ANDROID_APK.md)。
+
+项目保留 Capacitor 配置和依赖，Android 工程由开发者在本地生成，不提交到仓库。当前应用 ID 为测试用的 `com.example.deskpark`。需要 Node.js 22、Android Studio / Android SDK 和 JDK 21。首次使用时按打包指南安装依赖并生成工程，之后在仓库根目录执行：
+
+```bash
+npm run android:sync -w @park/web
+cd apps/web/android
+./gradlew assembleDebug
+```
+
+调试 APK 位于 `apps/web/android/app/build/outputs/apk/debug/app-debug.apk`。无服务器时可测试单人模式；需要联机时，在同步前为构建命令设置 `VITE_SERVER_URL=wss://你的域名/ws`。调试签名和测试应用 ID 不用于正式发布。
+
 项目从一开始就按「引擎与界面分离、平台能力集中」的方式组织，移植 App 有两条路线，可以先后进行。
 
 ## 为移植做好的准备
@@ -14,22 +28,20 @@
 | 视口适配：安全区（刘海屏）、横竖屏、触摸拖选、禁止缩放                                               | 全局样式 / `index.html`                |
 | PWA manifest：手机浏览器可「添加到主屏幕」                                                           | `apps/web/public/manifest.webmanifest` |
 
-## 路线一：Capacitor 封装（推荐先做，1–2 天）
+## 路线一：Capacitor 封装
 
-把现有网页原样打包为 iOS / Android 原生应用，界面与逻辑 100% 复用。
+把现有网页打包为 iOS / Android 原生应用。Android 工程在本地生成，实际构建方式见上方；下方是后续规划，插件、深链接和 iOS 仍待实现与验证。
 
-1. 安装：`npm i -w @park/web @capacitor/core @capacitor/cli @capacitor/ios @capacitor/android`
-2. 初始化：`npx cap init 闲亭 com.example.deskpark --web-dir apps/web/dist`
-3. 构建时指定线上服务器：`VITE_SERVER_URL=wss://你的域名/ws npm run build -w @park/web`
-4. `npx cap add ios && npx cap add android && npx cap sync`
-5. 在 `platform.ts` 中替换实现：
+1. Android 按 [打包指南](ANDROID_APK.md) 生成工程、同步资源并构建。
+2. 如需 iOS，安装相应平台依赖并生成 iOS 工程。
+3. 按需要在 `platform.ts` 中适配原生能力：
    - 存储 → `@capacitor/preferences`
    - 震动 → `@capacitor/haptics`（出牌、轮到你时轻触反馈）
    - 剪贴板 / 分享房间 → `@capacitor/clipboard`、`@capacitor/share`
-6. 原生配置：锁定横屏（或允许旋转）、状态栏沉浸、启动图、App 图标。
-7. 深链接：`deskpark://room/ABCD` 直接进入房间（使用 `@capacitor/app` 监听 `appUrlOpen` 后调用 `navigate`）。
+4. 原生配置：横竖屏、状态栏、启动图和 App 图标。
+5. 深链接：`deskpark://room/ABCD` 直接进入房间（使用 `@capacitor/app` 监听 `appUrlOpen` 后调用 `navigate`）。
 
-注意：网页中 hash 路由在 WebView 中天然可用；单人模式完全离线可玩。
+注意：网页中 hash 路由可在 WebView 中使用；普通单人对局可离线运行，云端 AI 需要网络。
 
 ## 路线二：React Native / Expo 原生界面（追求极致体验时）
 

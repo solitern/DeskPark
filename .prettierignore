@@ -3,3 +3,4 @@ dist
 coverage
 package-lock.json
 apps/web/public/engines
+apps/web/android
