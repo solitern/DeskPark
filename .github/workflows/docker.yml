@@ -30,7 +30,7 @@ jobs:
 
       # 1) 先构建本机架构镜像并实际运行，确认健康检查、网页与接口都正常
       - name: Build (amd64, local)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           load: true
@@ -76,7 +76,7 @@ jobs:
 
       - name: Build & push (amd64 + arm64)
         if: github.event_name != 'pull_request'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64,linux/arm64
