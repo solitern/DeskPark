@@ -12,6 +12,7 @@ import {
   highcard,
   onecard,
   sichuan,
+  guangdong,
   spellstones,
   texas,
   xiangqi,
@@ -83,6 +84,12 @@ describe('大模型接管：候选动作', () => {
     for (let seed = 1; seed <= 4; seed++)
       expect(
         checkPrompts(sichuan, 4, { ...sichuan.defaultOptions, rounds: 1 }, seed),
+      ).toBeGreaterThan(20);
+  });
+  it('广东推倒胡', () => {
+    for (let seed = 1; seed <= 4; seed++)
+      expect(
+        checkPrompts(guangdong, 4, { ...guangdong.defaultOptions, rounds: 1 }, seed),
       ).toBeGreaterThan(20);
   });
   it('魔法出包', () => {

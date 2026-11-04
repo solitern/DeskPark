@@ -70,6 +70,18 @@ export const GAME_UIS: GameUI[] = [
     people: '4 人 · 血战到底',
   },
   {
+    id: 'guangdong',
+    Board: lazy(() => import('./guangdong/GuangdongBoard')),
+    tint: ['#4a7a4f', '#22432f'],
+    showcase: [],
+    tiles: [
+      { id: 1, suit: 'wan', rank: 3 },
+      { id: 2, suit: 'tong', rank: 5 },
+      { id: 3, suit: 'tiao', rank: 7 },
+    ],
+    people: '4 人 · 推倒胡',
+  },
+  {
     id: 'xiangqi',
     Board: lazy(() => import('./xiangqi/XiangqiBoard')),
     tint: ['#b0742f', '#5c3612'],
