@@ -52,6 +52,7 @@ function GameArt({ ui }: { ui: GameUI }) {
             <MahjongTile
               key={t.id}
               tile={t}
+              honor={t.honor}
               w="clamp(34px, 7vw, 46px)"
               style={{ '--i': i - 1 } as CSSProperties}
             />

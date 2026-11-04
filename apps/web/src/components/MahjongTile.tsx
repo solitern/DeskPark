@@ -265,9 +265,54 @@ function WanFace({ rank }: { rank: number }) {
   );
 }
 
-export function TileFace({ tile }: { tile: Pick<mj.Tile, 'suit' | 'rank'> }) {
+/** 字牌：风牌与箭牌。白板画成空心方框 */
+function HonorFace({ label }: { label: string }) {
+  if (label === '白') {
+    return (
+      <g>
+        <rect
+          x={10}
+          y={12}
+          width={40}
+          height={56}
+          rx={4}
+          fill="none"
+          stroke={BLUE}
+          strokeWidth={3}
+        />
+        <rect
+          x={16}
+          y={18}
+          width={28}
+          height={44}
+          rx={2}
+          fill="none"
+          stroke={BLUE}
+          strokeWidth={1.6}
+        />
+      </g>
+    );
+  }
+  const color = label === '中' ? RED : label === '發' ? GREEN : INK;
+  return (
+    <g fontFamily="var(--font-display)" textAnchor="middle" fontWeight="700">
+      <text x={30} y={56} fontSize={42} fill={color}>
+        {label}
+      </text>
+    </g>
+  );
+}
+
+export function TileFace({
+  tile,
+  honor,
+}: {
+  tile: Pick<mj.Tile, 'suit' | 'rank'>;
+  honor?: string;
+}) {
   let body: ReactNode;
-  if (tile.suit === 'wan') body = <WanFace rank={tile.rank} />;
+  if (honor) body = <HonorFace label={honor} />;
+  else if (tile.suit === 'wan') body = <WanFace rank={tile.rank} />;
   else if (tile.suit === 'tong') body = <TongFace rank={tile.rank} />;
   else body = <TiaoFace rank={tile.rank} />;
   return (
@@ -279,6 +324,8 @@ export function TileFace({ tile }: { tile: Pick<mj.Tile, 'suit' | 'rank'> }) {
 
 export interface MahjongTileProps extends HTMLAttributes<HTMLDivElement> {
   tile?: Pick<mj.Tile, 'id' | 'suit' | 'rank'> | null;
+  /** 字牌名称（東 / 南 / 西 / 北 / 中 / 發 / 白），有线时覆盖 suit/rank 牌面 */
+  honor?: string;
   w?: string;
   faceDown?: boolean;
   selected?: boolean;
@@ -292,6 +339,7 @@ const SUIT_LABEL: Record<string, string> = { wan: '万', tiao: '条', tong: '筒
 
 export const MahjongTile = memo(function MahjongTile({
   tile,
+  honor,
   w = 'var(--tw)',
   faceDown,
   selected,
@@ -313,10 +361,10 @@ export const MahjongTile = memo(function MahjongTile({
     .filter(Boolean)
     .join(' ');
   const s = { '--w': w, ...style } as CSSProperties;
-  const label = tile && !faceDown ? `${tile.rank}${SUIT_LABEL[tile.suit]}` : '牌背';
+  const label = tile && !faceDown ? (honor ?? `${tile.rank}${SUIT_LABEL[tile.suit]}`) : '牌背';
   return (
     <div className={cls} style={s} role="img" aria-label={label} {...rest}>
-      {tile && !faceDown && <TileFace tile={tile} />}
+      {tile && !faceDown && <TileFace tile={tile} honor={honor} />}
       {que && <span className="mjtile__que">缺</span>}
     </div>
   );

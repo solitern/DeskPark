@@ -11,6 +11,7 @@ import { chess } from './games/chess';
 import { doudizhu } from './games/doudizhu';
 import { gemguild } from './games/gemguild';
 import { guangdong } from './games/guangdong';
+import { guangdong136 } from './games/guangdong136';
 import { guandan } from './games/guandan';
 import { hexisle } from './games/hexisle';
 import { highcard } from './games/highcard';
@@ -26,6 +27,7 @@ export * as tx from './games/texas';
 export * as hc from './games/highcard';
 export * as sc from './games/sichuan';
 export * as gdm from './games/guangdong';
+export * as gd136 from './games/guangdong136';
 export * as ss from './games/spellstones';
 export * as oc from './games/onecard';
 export * as hi from './games/hexisle';
@@ -40,6 +42,7 @@ export {
   texas,
   sichuan,
   guangdong,
+  guangdong136,
   xiangqi,
   chess,
   spellstones,
@@ -56,6 +59,7 @@ for (const g of [
   texas,
   sichuan,
   guangdong,
+  guangdong136,
   xiangqi,
   chess,
   spellstones,
