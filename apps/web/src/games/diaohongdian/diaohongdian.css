@@ -1,0 +1,217 @@
+.dh {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 2px max(14px, 2vw) 10px;
+  gap: 6px;
+}
+
+/* 对手座位 */
+.dh__opps {
+  display: flex;
+  justify-content: center;
+  gap: max(18px, 4vw);
+  padding-top: 2px;
+}
+
+/* 中间：台面 + 底牌堆 */
+.dh__board {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dh__middle {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 14px;
+}
+.dh__table {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-radius: 16px;
+  padding: 8px 10px 10px;
+  background: radial-gradient(
+    80% 80% at 50% 45%,
+    rgba(255, 255, 255, 0.07),
+    rgba(255, 255, 255, 0.015)
+  );
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    inset 0 0 0 9px rgba(0, 0, 0, 0.06),
+    0 14px 40px rgba(0, 0, 0, 0.16);
+}
+.dh__tablehead {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+.dh__hint {
+  color: var(--gold, #f0d59b);
+  font-weight: 600;
+}
+.dh__cards {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  justify-content: center;
+  gap: 10px;
+  overflow-y: auto;
+  padding: 4px 2px;
+}
+.dh__slot {
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 9px;
+  transition: transform 0.16s var(--ease-out, ease), box-shadow 0.16s;
+}
+.dh__slot:disabled {
+  cursor: default;
+}
+.dh__slot.is-match {
+  box-shadow: 0 0 0 2px var(--gold, #f0d59b);
+  animation: dh-pulse 1.1s ease-in-out infinite;
+  cursor: pointer;
+}
+.dh__slot.is-match:hover {
+  transform: translateY(-3px);
+}
+.dh__empty {
+  font-size: 12px;
+  opacity: 0.5;
+  padding: 10px 2px;
+}
+
+/* 底牌与待钓牌 */
+.dh__side {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding-top: 6px;
+}
+.dh__stack,
+.dh__pending {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.dh__stacknum {
+  position: absolute;
+  top: 2px;
+  right: -6px;
+  min-width: 20px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+}
+.dh__stackcap,
+.dh__pendingcap {
+  font-size: 11px;
+  opacity: 0.65;
+}
+
+.dh__last {
+  min-height: 18px;
+  font-size: 12px;
+  text-align: center;
+  opacity: 0.8;
+}
+
+/* 自己的座位与手牌 */
+.dh__dock {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+.dh__me {
+  flex: none;
+  padding-bottom: 2px;
+}
+.dh__hand {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* 本局结算浮层 */
+.dh__round {
+  position: absolute;
+  left: 50%;
+  bottom: 150px;
+  translate: -50% 0;
+  min-width: 220px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: rgba(10, 12, 10, 0.82);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+  animation: pop-in 0.3s var(--ease-out, ease);
+  z-index: 5;
+}
+.dh__roundtitle {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  text-align: center;
+}
+.dh__roundrow {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  font-size: 12px;
+  line-height: 20px;
+}
+.dh__roundrow.is-me {
+  color: var(--gold, #f0d59b);
+}
+.dh__roundrow small {
+  opacity: 0.6;
+}
+.dh__roundnote {
+  margin-top: 6px;
+  font-size: 11px;
+  opacity: 0.65;
+  text-align: center;
+}
+
+@keyframes dh-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px rgba(240, 213, 155, 0.75);
+  }
+  50% {
+    box-shadow: 0 0 0 2px rgba(240, 213, 155, 0.95), 0 0 14px rgba(240, 213, 155, 0.35);
+  }
+}
+
+@media (max-height: 560px) {
+  .dh__round {
+    bottom: 118px;
+  }
+  .dh__middle {
+    gap: 8px;
+  }
+}

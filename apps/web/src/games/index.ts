@@ -149,6 +149,13 @@ export const GAME_UIS: GameUI[] = [
     people: '2–6 人',
     badge: '示例',
   },
+  {
+    id: 'diaohongdian',
+    Board: lazy(() => import('./diaohongdian/DiaohongdianBoard')),
+    tint: ['#b8433a', '#5f1f22'],
+    showcase: [c(1, 'H', 5), c(2, 'D', 9), c(3, 'S', 5)],
+    people: '2–4 人 · 红牌计分',
+  },
 ];
 
 export function getGameUI(id: string): GameUI | undefined {
