@@ -127,12 +127,13 @@ function HlTileView({
 
 /**
  * 碰牌标记：把来源方向的那张翻成背面，一眼看出碰的是谁。
- * 下家（出牌顺序下一位）翻最右，对家翻中间，上家翻最左。
+ * 下家（出牌顺序下一位）翻最右，对家翻中间，上家翻最左；加杠后标记保留。
  */
-function pengFlipIndex(owner: number, from: number | null): number {
+function pengFlipIndex(m: hl.HlMeld, owner: number): number {
+  const from = m.type === 'pung' ? m.from : m.kongType === 'ba' ? m.pengFrom : null;
   if (from === null) return -1;
   const rel = (from - owner + 4) % 4;
-  return rel === 1 ? 2 : rel === 2 ? 1 : rel === 3 ? 0 : -1;
+  return rel === 1 ? m.tiles.length - 1 : rel === 2 ? 1 : rel === 3 ? 0 : -1;
 }
 
 function Melds({ melds, w, owner }: { melds: hl.HlMeld[]; w: string; owner: number }) {
@@ -140,6 +141,7 @@ function Melds({ melds, w, owner }: { melds: hl.HlMeld[]; w: string; owner: numb
   return (
     <div className="sc-melds">
       {melds.map((m, i) => {
+        const flip = pengFlipIndex(m, owner);
         const title =
           m.type === 'kong'
             ? m.kongType === 'an'
@@ -151,12 +153,7 @@ function Melds({ melds, w, owner }: { melds: hl.HlMeld[]; w: string; owner: numb
         return (
           <div key={i} className={`sc-meld ${m.kongType === 'an' ? 'is-an' : ''}`} title={title}>
             {m.tiles.map((t, k) => (
-              <HlTileView
-                key={t.id}
-                tile={t}
-                w={w}
-                faceDown={m.type === 'pung' && k === pengFlipIndex(owner, m.from)}
-              />
+              <HlTileView key={t.id} tile={t} w={w} faceDown={k === flip} />
             ))}
             {m.kongType === 'an' && <span className="sc-meld__tag">暗</span>}
           </div>
@@ -255,6 +252,22 @@ export default function HeluoBoard({ ctl }: { ctl: Ctl }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [v.round]);
+
+  // 进入包次区：弹一次提醒（每盘一次）
+  const [baoReveal, setBaoReveal] = useState(false);
+  const baoShown = useRef(-1);
+  useEffect(() => {
+    if (v.phase !== 'play' || !v.baoActive || baoShown.current === v.round) return;
+    baoShown.current = v.round;
+    setBaoReveal(true);
+    playSound('deal');
+    speak('进入包次区');
+    const t = window.setTimeout(() => setBaoReveal(false), 2400);
+    return () => {
+      window.clearTimeout(t);
+      setBaoReveal(false);
+    };
+  }, [v.baoActive, v.round, v.phase]);
 
   // 报牌
   const spoken = useRef('');
@@ -514,6 +527,24 @@ export default function HeluoBoard({ ctl }: { ctl: Ctl }) {
             </div>
             <div className="hl-reveal__title">本盘次牌</div>
             <div className="hl-reveal__name">{KIND_NAME[v.ciKind]}</div>
+          </div>
+        </div>
+      )}
+
+      {baoReveal && ciReveal === null && (
+        <div
+          className="hl-reveal"
+          onClick={() => setBaoReveal(false)}
+          role="dialog"
+          aria-label="进入包次区"
+        >
+          <div className="hl-reveal__card">
+            <div className="hl-reveal__rays is-bao" />
+            <div className="hl-reveal__tile">
+              <div className="hl-bao-badge">包</div>
+            </div>
+            <div className="hl-reveal__title">进入包次区</div>
+            <div className="hl-reveal__name">打生张小心被杠次</div>
           </div>
         </div>
       )}

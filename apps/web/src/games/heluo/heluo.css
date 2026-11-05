@@ -172,3 +172,22 @@
     animation: none;
   }
 }
+
+/* 包次区提醒 */
+.hl-reveal__rays.is-bao {
+  background: repeating-conic-gradient(rgba(214, 88, 64, 0.38) 0deg 10deg, transparent 10deg 20deg);
+}
+.hl-bao-badge {
+  display: grid;
+  place-items: center;
+  width: clamp(72px, 15vmin, 128px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #e0644a, #8f2a1c);
+  color: #fff3dc;
+  font-size: clamp(36px, 8vmin, 64px);
+  font-weight: 800;
+  box-shadow:
+    0 0 0 4px var(--gold, #d4a24a),
+    0 0 32px 8px rgba(214, 88, 64, 0.6);
+}

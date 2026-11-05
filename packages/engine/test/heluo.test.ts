@@ -66,6 +66,8 @@ describe('河洛杠次 · 计分', () => {
   it('杠分', () => {
     expect(hl.kongDeltas('ming', 0, 1)).toEqual([0.5, -0.5, 0, 0]);
     expect(hl.kongDeltas('an', 0, null)).toEqual([1.5, -0.5, -0.5, -0.5]);
+    // 加杠：只有当初被碰的那家付
+    expect(hl.kongDeltas('ba', 0, 2)).toEqual([0.5, 0, -0.5, 0]);
   });
 });
 

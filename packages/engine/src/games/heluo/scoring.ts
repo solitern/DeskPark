@@ -57,10 +57,13 @@ export function winDeltas(
   return d;
 }
 
-/** 杠分：明杠由点杠者付 0.5；暗杠、加杠三家各付 0.5。 */
+/**
+ * 杠分：明杠由点杠者付 0.5；加杠由当初被碰的出牌人付 0.5（from 传碰牌来源）；
+ * 暗杠三家各付 0.5。
+ */
 export function kongDeltas(type: KongType, seat: Seat, from: Seat | null): number[] {
   const d = [0, 0, 0, 0];
-  if (type === 'ming' && from !== null) {
+  if ((type === 'ming' || type === 'ba') && from !== null) {
     d[from] -= 0.5;
     d[seat] += 0.5;
     return d;
