@@ -521,11 +521,11 @@ export const heluogangci: GameDefinition<HlState, HlAction, HlView, HlOptions> =
       '屁次：手里有三张与次牌相同的牌即可屁次，其余手牌是什么都算。',
       '软次可自摸：每家 -0.5，赢家 +1.5；硬次只能次。',
       '杠分：明杠点杠者付 0.5；暗杠、加杠三家各付 0.5。',
-      '包次：剩 12 张后打出生张导致他人杠出次，放张者 -4，赢家 +4。',
+      '包次：牌墙剩 5 墩（10 张）起，打出生张被别人明杠直接杠出次，放张者 -4，赢家 +4；暗次、加杠次不算包次。',
       '胡牌者下一盘坐庄；荒庄不换庄，杠分作废；触发次的那一杠不另算杠分。',
     ],
   },
-  defaultOptions: { mode: 'soft', baoCi: true, baoThreshold: 12, rounds: 4 },
+  defaultOptions: { mode: 'soft', baoCi: true, baoThreshold: 10, rounds: 4 },
   optionFields: [
     {
       key: 'mode',
@@ -554,7 +554,7 @@ export const heluogangci: GameDefinition<HlState, HlAction, HlView, HlOptions> =
     const opts: HlOptions = {
       mode: options?.mode === 'hard' ? 'hard' : 'soft',
       baoCi: options?.baoCi !== false,
-      baoThreshold: Number.isFinite(options?.baoThreshold) ? options.baoThreshold : 12,
+      baoThreshold: Number.isFinite(options?.baoThreshold) ? options.baoThreshold : 10,
       rounds: Number.isFinite(options?.rounds) ? Math.max(0, Math.floor(options.rounds)) : 4,
     };
     const s: HlState = {

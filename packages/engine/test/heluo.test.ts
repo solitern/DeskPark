@@ -116,6 +116,56 @@ describe('河洛杠次 · 流程', () => {
     expect(next.result?.win?.seat).toBe(1);
   });
 
+  function mingCiAt(wallLeft: number) {
+    const s = base();
+    const pool = new Pool();
+    s.ciTile = pool.tiles('3z')[0];
+    s.ciKind = s.ciTile.kind;
+    s.players[1].hand = pool.tiles('444m888s666p999p3z');
+    s.players[0].hand = pool.tiles('9p123m1s5z');
+    s.players[2].hand = pool.tiles('147m258s');
+    s.players[3].hand = pool.tiles('369m147s');
+    s.wall = s.wall.slice(0, wallLeft);
+    s.turn = 0;
+    s.turnDrawn = true;
+    const after = heluogangci.apply(s, 0, { type: 'discard', tile: s.players[0].hand[0].id });
+    return heluogangci.apply(after, 1, { type: 'gang' });
+  }
+
+  it('包次：牌墙剩 5 墩（10 张）起，生张被明杠出次才算包次', () => {
+    expect(heluogangci.defaultOptions.baoThreshold).toBe(10);
+    expect(mingCiAt(11).result?.win?.kind).toBe('mingci');
+    const bao = mingCiAt(10);
+    expect(bao.result?.win?.kind).toBe('baoci');
+    expect(bao.result?.win?.from).toBe(0);
+  });
+
+  it('包次区内暗次、加杠次都不算包次', () => {
+    const s = base();
+    const pool = new Pool();
+    s.ciTile = pool.tiles('9p')[0];
+    s.ciKind = s.ciTile.kind;
+    s.players[0].hand = pool.tiles('1111m234s567s888p9p');
+    s.wall = s.wall.slice(0, 4);
+    s.turn = 0;
+    s.turnDrawn = true;
+    const an = heluogangci.apply(s, 0, { type: 'gang', tile: s.players[0].hand[0].id });
+    expect(an.result?.win?.kind).toBe('anci');
+
+    const t = base();
+    const p2 = new Pool();
+    t.ciTile = p2.tiles('9p')[0];
+    t.ciKind = t.ciTile.kind;
+    const pung = p2.tiles('111m');
+    t.players[0].melds = [{ type: 'pung', kind: pung[0].kind, tiles: pung, from: 2, pengFrom: 2 }];
+    t.players[0].hand = p2.tiles('1m234s567s888p9p');
+    t.wall = t.wall.slice(0, 4);
+    t.turn = 0;
+    t.turnDrawn = true;
+    const ba = heluogangci.apply(t, 0, { type: 'gang', tile: t.players[0].hand[0].id });
+    expect(ba.result?.win?.kind).toBe('mingci');
+  });
+
   it('杠了次不上时，杠按钮不标记为次', () => {
     const s = base();
     const pool = new Pool();
