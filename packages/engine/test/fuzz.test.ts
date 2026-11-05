@@ -7,6 +7,7 @@ import {
   doudizhu,
   gemguild,
   guandan,
+  heluogangci,
   hexisle,
   highcard,
   onecard,
@@ -173,6 +174,16 @@ describe('畸形动作模糊测试（模拟恶意联机客户端）', () => {
         4,
         sichuan.defaultOptions,
         ['exchange', 'que', 'discard', 'hu', 'gang', 'peng', 'pass', 'ready'],
+        seed,
+      );
+  });
+  it('河洛杠次', () => {
+    for (let seed = 1; seed <= 8; seed++)
+      fuzz(
+        heluogangci,
+        4,
+        heluogangci.defaultOptions,
+        ['discard', 'gang', 'peng', 'pass', 'pici', 'hu', 'ready'],
         seed,
       );
   });
