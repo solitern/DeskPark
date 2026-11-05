@@ -125,7 +125,17 @@ function HlTileView({
   );
 }
 
-function Melds({ melds, w }: { melds: hl.HlMeld[]; w: string }) {
+/**
+ * 碰牌标记：把来源方向的那张翻成背面，一眼看出碰的是谁。
+ * 下家（出牌顺序下一位）翻最右，对家翻中间，上家翻最左。
+ */
+function pengFlipIndex(owner: number, from: number | null): number {
+  if (from === null) return -1;
+  const rel = (from - owner + 4) % 4;
+  return rel === 1 ? 2 : rel === 2 ? 1 : rel === 3 ? 0 : -1;
+}
+
+function Melds({ melds, w, owner }: { melds: hl.HlMeld[]; w: string; owner: number }) {
   if (!melds.length) return null;
   return (
     <div className="sc-melds">
@@ -140,8 +150,13 @@ function Melds({ melds, w }: { melds: hl.HlMeld[]; w: string }) {
             : `碰${m.from === null ? '' : ` ←${WIND[m.from]}`}`;
         return (
           <div key={i} className={`sc-meld ${m.kongType === 'an' ? 'is-an' : ''}`} title={title}>
-            {m.tiles.map((t) => (
-              <HlTileView key={t.id} tile={t} w={w} />
+            {m.tiles.map((t, k) => (
+              <HlTileView
+                key={t.id}
+                tile={t}
+                w={w}
+                faceDown={m.type === 'pung' && k === pengFlipIndex(owner, m.from)}
+              />
             ))}
             {m.kongType === 'an' && <span className="sc-meld__tag">暗</span>}
           </div>
@@ -305,7 +320,7 @@ export default function HeluoBoard({ ctl }: { ctl: Ctl }) {
         />
         {p.won && <span className="sc-wonbadge">{WIN_NAME[p.won.kind]}</span>}
         <div className="sc-oppo">
-          <Melds melds={p.melds} w="var(--rw)" />
+          <Melds melds={p.melds} w="var(--rw)" owner={s} />
           <div className="sc-backs">
             {p.hand
               ? p.hand.map((t) => <HlTileView key={t.id} tile={t} w="var(--rw)" />)
@@ -477,7 +492,7 @@ export default function HeluoBoard({ ctl }: { ctl: Ctl }) {
       <div className="sc-hand">
         {!spectator && (
           <>
-            <Melds melds={mine.melds} w="calc(var(--tw) * 0.78)" />
+            <Melds melds={mine.melds} w="calc(var(--tw) * 0.78)" owner={me} />
             <div className="sc-hand__tiles">{handMain.map(renderHandTile)}</div>
             {drawnTile && <div className="sc-hand__drawn">{renderHandTile(drawnTile)}</div>}
           </>

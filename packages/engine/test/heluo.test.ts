@@ -166,6 +166,31 @@ describe('河洛杠次 · 流程', () => {
     expect(ba.result?.win?.kind).toBe('mingci');
   });
 
+  it('荒庄：次牌前一张摸完还没人杠次，之前的杠分全部作废', () => {
+    const s = base();
+    const pool = new Pool();
+    pool.tiles('9p');
+    s.ciTile = hl.hlTileOf(26 * 4);
+    s.ciKind = 26;
+    s.players[0].hand = pool.tiles('1111m258s147p1357z');
+    s.players[1].hand = pool.tiles('2m');
+    s.players[2].hand = pool.tiles('3m');
+    s.players[3].hand = pool.tiles('4m');
+    s.wall = s.wall.slice(0, 1);
+    s.turn = 0;
+    s.turnDrawn = true;
+    const ganged = heluogangci.apply(s, 0, { type: 'gang', tile: s.players[0].hand[0].id });
+    expect(ganged.gangDeltas).toEqual([1.5, -0.5, -0.5, -0.5]);
+    expect(ganged.wall.length).toBe(0);
+    const over = heluogangci.apply(ganged, 0, {
+      type: 'discard',
+      tile: ganged.players[0].hand[0].id,
+    });
+    expect(over.result?.reason).toBe('wall');
+    expect(over.result?.gangCounted).toBe(false);
+    expect(over.result?.deltas).toEqual([0, 0, 0, 0]);
+  });
+
   it('杠了次不上时，杠按钮不标记为次', () => {
     const s = base();
     const pool = new Pool();
