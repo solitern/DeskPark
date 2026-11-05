@@ -7,6 +7,8 @@ import {
   doudizhu,
   gemguild,
   guandan,
+  guangdong,
+  guangdong136,
   hexisle,
   highcard,
   onecard,
@@ -175,6 +177,27 @@ describe('畸形动作模糊测试（模拟恶意联机客户端）', () => {
         ['exchange', 'que', 'discard', 'hu', 'gang', 'peng', 'pass', 'ready'],
         seed,
       );
+  });
+  it('广东推倒胡', () => {
+    for (let seed = 1; seed <= 8; seed++)
+      fuzz(
+        guangdong,
+        4,
+        guangdong.defaultOptions,
+        ['discard', 'hu', 'gang', 'peng', 'chi', 'pass', 'ready'],
+        seed,
+      );
+  });
+  it('广东字牌 136 张', () => {
+    for (const scoring of ['jipinghu', 'laozhang'] as const)
+      for (let seed = 1; seed <= 4; seed++)
+        fuzz(
+          guangdong136,
+          4,
+          { ...guangdong136.defaultOptions, scoring },
+          ['discard', 'hu', 'gang', 'peng', 'chi', 'pass', 'ready'],
+          seed,
+        );
   });
   it('魔法出包', () => {
     for (let seed = 1; seed <= 20; seed++)

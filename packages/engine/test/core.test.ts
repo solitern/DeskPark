@@ -19,6 +19,8 @@ describe('基础设施', () => {
       'guandan',
       'texas',
       'sichuan',
+      'guangdong',
+      'guangdong136',
       'xiangqi',
       'chess',
       'spellstones',
@@ -26,6 +28,7 @@ describe('基础设施', () => {
       'hexisle',
       'gemguild',
       'highcard',
+      'diaohongdian',
     ]);
     const ddz = listGames()[0];
     expect(normalizeOptions(ddz, { baseScore: 999, rounds: 3 })).toEqual({

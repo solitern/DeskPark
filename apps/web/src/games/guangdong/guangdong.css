@@ -1,0 +1,21 @@
+/* 广东推倒胡：牌桌沿用四川麻将的 .sc 皮肤，这里只补吃牌相关的小差异 */
+
+.gd .action-bar {
+  flex-wrap: wrap;
+}
+
+.gd .sc-actions {
+  padding-bottom: 2px;
+}
+
+/* 吃牌按钮比碰杠窄一些，三种吃法并排时不至于挤爆操作栏 */
+.gd .action-bar .btn {
+  white-space: nowrap;
+}
+
+.gd-fan {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gold, #e6c27a);
+  margin-left: 4px;
+}

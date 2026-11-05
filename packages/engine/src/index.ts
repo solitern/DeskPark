@@ -8,8 +8,11 @@ export * from './core/coach';
 
 import { registerGame } from './core/registry';
 import { chess } from './games/chess';
+import { diaohongdian } from './games/diaohongdian';
 import { doudizhu } from './games/doudizhu';
 import { gemguild } from './games/gemguild';
+import { guangdong } from './games/guangdong';
+import { guangdong136 } from './games/guangdong136';
 import { guandan } from './games/guandan';
 import { hexisle } from './games/hexisle';
 import { highcard } from './games/highcard';
@@ -23,7 +26,10 @@ export * as ddz from './games/doudizhu';
 export * as gd from './games/guandan';
 export * as tx from './games/texas';
 export * as hc from './games/highcard';
+export * as dhd from './games/diaohongdian';
 export * as sc from './games/sichuan';
+export * as gdm from './games/guangdong';
+export * as gd136 from './games/guangdong136';
 export * as ss from './games/spellstones';
 export * as oc from './games/onecard';
 export * as hi from './games/hexisle';
@@ -37,6 +43,8 @@ export {
   guandan,
   texas,
   sichuan,
+  guangdong,
+  guangdong136,
   xiangqi,
   chess,
   spellstones,
@@ -44,6 +52,7 @@ export {
   hexisle,
   gemguild,
   highcard,
+  diaohongdian,
 };
 
 // 内置玩法（顺序即大厅展示顺序）
@@ -52,6 +61,8 @@ for (const g of [
   guandan,
   texas,
   sichuan,
+  guangdong,
+  guangdong136,
   xiangqi,
   chess,
   spellstones,
@@ -59,5 +70,6 @@ for (const g of [
   hexisle,
   gemguild,
   highcard,
+  diaohongdian,
 ])
   registerGame(g);

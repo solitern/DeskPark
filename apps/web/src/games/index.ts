@@ -21,7 +21,7 @@ export interface GameUI {
   /** 大厅卡片上展示的几张牌 */
   showcase: Card[];
   /** 麻将类玩法：大厅卡片上展示的麻将牌 */
-  tiles?: { id: number; suit: 'wan' | 'tiao' | 'tong'; rank: number }[];
+  tiles?: { id: number; suit: 'wan' | 'tiao' | 'tong'; rank: number; honor?: string }[];
   /** 人数说明 */
   people: string;
   /** 额外标签 */
@@ -68,6 +68,30 @@ export const GAME_UIS: GameUI[] = [
       { id: 3, suit: 'tiao', rank: 1 },
     ],
     people: '4 人 · 血战到底',
+  },
+  {
+    id: 'guangdong',
+    Board: lazy(() => import('./guangdong/GuangdongBoard')),
+    tint: ['#4a7a4f', '#22432f'],
+    showcase: [],
+    tiles: [
+      { id: 1, suit: 'wan', rank: 3 },
+      { id: 2, suit: 'tong', rank: 5 },
+      { id: 3, suit: 'tiao', rank: 7 },
+    ],
+    people: '4 人 · 推倒胡',
+  },
+  {
+    id: 'guangdong136',
+    Board: lazy(() => import('./guangdong136/Gd136Board')),
+    tint: ['#3d6a46', '#1b3a26'],
+    showcase: [],
+    tiles: [
+      { id: 1, suit: 'wan', rank: 5 },
+      { id: 2, suit: 'tong', rank: 3 },
+      { id: 3, suit: 'wan', rank: 1, honor: '東' },
+    ],
+    people: '4 人 · 字牌 136 张',
   },
   {
     id: 'xiangqi',
@@ -124,6 +148,13 @@ export const GAME_UIS: GameUI[] = [
     showcase: [c(1, 'D', 7), c(2, 'C', 12), c(3, 'H', 10)],
     people: '2–6 人',
     badge: '示例',
+  },
+  {
+    id: 'diaohongdian',
+    Board: lazy(() => import('./diaohongdian/DiaohongdianBoard')),
+    tint: ['#b8433a', '#5f1f22'],
+    showcase: [c(1, 'H', 5), c(2, 'D', 9), c(3, 'S', 5)],
+    people: '2–4 人 · 红牌计分',
   },
 ];
 

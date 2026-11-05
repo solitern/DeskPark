@@ -167,6 +167,40 @@ describe('联机服务器', () => {
     d.close();
   });
 
+  it('广东推倒胡联机：只看得到自己的手牌，可以出牌并推进', async () => {
+    type GdView = {
+      phase: string;
+      hand: { id: number }[];
+      players: { hand: { id: number }[] | null }[];
+      legal: { discard: number[] } | null;
+    };
+    const z = new TestClient();
+    await z.opened;
+    z.send({ t: 'hello', token: 'token-zzzzzzzzzzzzzzzz', name: '壬', v: PROTOCOL_VERSION });
+    z.send({ t: 'create', gameId: 'guangdong' });
+    await z.wait('room');
+    for (const seat of [1, 2, 3]) z.send({ t: 'bot', seat, add: true });
+    await z.wait('room', (m) => m.room.seats.filter((s) => s.kind === 'bot').length === 3);
+    z.send({ t: 'start' });
+
+    const first = await z.wait('game', (m) => (m.view as GdView).phase === 'play', 20000);
+    const view = first.view as GdView;
+    expect(view.hand.length).toBeGreaterThanOrEqual(13);
+    // 每个人的手牌只在自己的 view.hand 里，players 上的 hand 一律不下发
+    expect(view.players.every((p) => p.hand === null)).toBe(true);
+
+    const mine = await z.wait(
+      'game',
+      (m) => ((m.view as GdView).legal?.discard.length ?? 0) > 0,
+      20000,
+    );
+    const v2 = mine.view as GdView;
+    z.send({ t: 'act', action: { type: 'discard', tile: v2.hand[0].id } });
+    const after = await z.wait('game', (m) => m.version > mine.version, 20000);
+    expect(after.version).toBeGreaterThan(mine.version);
+    z.close();
+  });
+
   it('魔法出包联机：看不到自己的石头，看得到别人的，可以施法', async () => {
     const e = new TestClient();
     await e.opened;
