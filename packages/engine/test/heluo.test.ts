@@ -88,11 +88,43 @@ describe('河洛杠次 · 流程', () => {
     s.turnDrawn = true;
     const gangTile = s.players[0].hand[0].id;
     const L = hl.legalOf(s, 0);
-    expect(L.gang.some((g) => g.type === 'an')).toBe(true);
+    expect(L.gang.some((g) => g.type === 'an' && g.ci)).toBe(true);
     const next = heluogangci.apply(s, 0, { type: 'gang', tile: gangTile });
     expect(next.phase).toBe('roundOver');
     expect(next.result?.win?.kind).toBe('anci');
     expect(next.result?.deltas).toEqual([6, -2, -2, -2]);
+  });
+
+  it('别人打出的牌能杠且次牌能胡：杠按钮标记为次，杠下去就是明次', () => {
+    const s = base();
+    const pool = new Pool();
+    // 次牌西风；下家手里 444m 888s 666p 999p 西，单吊西。上家打出 9 筒 → 明杠 → 次牌西胡
+    s.ciTile = pool.tiles('3z')[0];
+    s.ciKind = s.ciTile.kind;
+    s.players[1].hand = pool.tiles('444m888s666p999p3z');
+    s.players[0].hand = pool.tiles('9p123m1s5z');
+    s.players[2].hand = pool.tiles('147m258s');
+    s.players[3].hand = pool.tiles('369m147s');
+    s.turn = 0;
+    s.turnDrawn = true;
+    const nine = s.players[0].hand[0].id;
+    const after = heluogangci.apply(s, 0, { type: 'discard', tile: nine });
+    const L = hl.legalOf(after, 1);
+    expect(L.gang).toEqual([{ tile: nine, type: 'ming', ci: true }]);
+    const next = heluogangci.apply(after, 1, { type: 'gang' });
+    expect(next.result?.win?.kind).toBe('mingci');
+    expect(next.result?.win?.seat).toBe(1);
+  });
+
+  it('杠了次不上时，杠按钮不标记为次', () => {
+    const s = base();
+    const pool = new Pool();
+    s.ciTile = pool.tiles('7z')[0];
+    s.ciKind = s.ciTile.kind;
+    s.players[0].hand = pool.tiles('1111m258s147p1357z');
+    s.turn = 0;
+    s.turnDrawn = true;
+    expect(hl.legalOf(s, 0).gang.every((g) => !g.ci)).toBe(true);
   });
 
   it('杠后次不上：记杠分，从牌墙尾补牌', () => {

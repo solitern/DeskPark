@@ -149,7 +149,8 @@ export type HlAction =
 
 export interface HlLegal {
   discard: number[];
-  gang: { tile: number; type: KongType }[];
+  /** ci：这一杠开出来正好用次牌胡（界面直接显示「次」） */
+  gang: { tile: number; type: KongType; ci: boolean }[];
   peng: boolean;
   pass: boolean;
   pici: boolean;
@@ -443,6 +444,13 @@ function resolveClaims(s: HlState) {
   drawFront(s, nextActive(s, source));
 }
 
+/** 假如开这一杠（手里拿走 remove 张该种牌、副露变为 meldCount），次牌能否胡 */
+function kongWinsCi(s: HlState, p: HlState['players'][number], kind: number, meldCount: number) {
+  if (!s.ciTile) return false;
+  const rest = p.hand.filter((t) => t.kind !== kind);
+  return isHlWin(countHlKinds([...rest, s.ciTile]), meldCount);
+}
+
 export function legalOf(s: HlState, seat: Seat): HlLegal {
   const none: HlLegal = {
     discard: [],
@@ -466,7 +474,9 @@ export function legalOf(s: HlState, seat: Seat): HlLegal {
       ...none,
       peng: opts.includes('peng'),
       pass: opts.includes('pass'),
-      gang: opts.includes('gang') ? [{ tile: w.tile.id, type: 'ming' }] : [],
+      gang: opts.includes('gang')
+        ? [{ tile: w.tile.id, type: 'ming', ci: kongWinsCi(s, p, w.tile.kind, p.melds.length + 1) }]
+        : [],
     };
   }
 
@@ -479,9 +489,10 @@ export function legalOf(s: HlState, seat: Seat): HlLegal {
     for (const t of p.hand) {
       if (seen.has(t.kind)) continue;
       seen.add(t.kind);
-      if (countKind(p.hand, t.kind) >= 4) gang.push({ tile: t.id, type: 'an' });
+      if (countKind(p.hand, t.kind) >= 4)
+        gang.push({ tile: t.id, type: 'an', ci: kongWinsCi(s, p, t.kind, p.melds.length + 1) });
       else if (p.melds.some((m) => m.type === 'pung' && m.kind === t.kind))
-        gang.push({ tile: t.id, type: 'ba' });
+        gang.push({ tile: t.id, type: 'ba', ci: kongWinsCi(s, p, t.kind, p.melds.length) });
     }
   }
   // 屁次：手里有三张次牌即可，其余手牌不论

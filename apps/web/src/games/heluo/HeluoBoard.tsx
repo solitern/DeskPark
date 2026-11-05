@@ -406,8 +406,11 @@ export default function HeluoBoard({ ctl }: { ctl: Ctl }) {
                 <HlTileView tile={v.window.tile} w="calc(var(--rw) * 1.1)" />
               </span>
               {L.gang.length > 0 && (
-                <Button variant="felt" onClick={() => act({ type: 'gang' })}>
-                  杠
+                <Button
+                  variant={L.gang[0].ci ? 'felt-primary' : 'felt'}
+                  onClick={() => act({ type: 'gang' })}
+                >
+                  {L.gang[0].ci ? '杠次' : '杠'}
                 </Button>
               )}
               {L.peng && (
@@ -427,10 +430,10 @@ export default function HeluoBoard({ ctl }: { ctl: Ctl }) {
               {L.gang.map((g) => (
                 <Button
                   key={g.tile}
-                  variant="felt"
+                  variant={g.ci ? 'felt-primary' : 'felt'}
                   onClick={() => act({ type: 'gang', tile: g.tile })}
                 >
-                  {g.type === 'an' ? '暗杠' : '加杠'}{' '}
+                  {g.ci ? (g.type === 'an' ? '暗次' : '加杠次') : g.type === 'an' ? '暗杠' : '加杠'}{' '}
                   {KIND_NAME[v.hand.find((t) => t.id === g.tile)?.kind ?? 0]}
                 </Button>
               ))}
