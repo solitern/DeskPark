@@ -155,6 +155,8 @@ export interface SzRoundResult {
   deltas: number[];
   chipsAfter: number[];
   dealer: Seat;
+  /** 本局庄家的底分（结算时已经算好，下一局会变） */
+  dealerBase: number;
   nextDealer: Seat;
   dealerKeeps: boolean;
   sessionEnded: boolean;
@@ -475,6 +477,7 @@ function endRound(state: SzState, reason: 'win' | 'wall'): void {
   const dealerWon = state.wins.some((w) => w.seat === state.dealer);
   const dealerKeeps = reason === 'wall' || dealerWon;
   const nextDealer = dealerKeeps ? state.dealer : nextSeat(state.dealer);
+  const dealerBase = dealerBaseOf(state);
 
   const zeroCount = state.chips.filter((c) => c <= 0).length;
   let sessionEnded = false;
@@ -505,6 +508,7 @@ function endRound(state: SzState, reason: 'win' | 'wall'): void {
     deltas,
     chipsAfter: [...state.chips],
     dealer: state.dealer,
+    dealerBase,
     nextDealer,
     dealerKeeps,
     sessionEnded,
@@ -1075,9 +1079,11 @@ export const suichang: GameDefinition<SzState, SzAction, SzView, SzOptions> = {
       session: state.session,
       round: state.round,
       options: state.options,
-      dealer: state.dealer,
+      // 局结束后仍显示「本局庄」，下一局庄在 result.nextDealer 里
+      dealer: state.phase === 'play' || !state.result ? state.dealer : state.result.dealer,
       dealerStreak: state.dealerStreak,
-      dealerBase: dealerBaseOf(state),
+      dealerBase:
+        state.phase === 'play' || !state.result ? dealerBaseOf(state) : state.result.dealerBase,
       chips: state.chips,
       wallCount: state.wall.length,
       turn: state.phase === 'play' ? state.turn : null,

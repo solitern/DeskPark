@@ -198,6 +198,27 @@ describe('遂昌麻将 · 支付', () => {
     expect(s.chips).toEqual([86, 38, 38, 38]);
   });
 
+  it('庄家点炮：庄赔 48、两个闲各 20（截图中的 1 盘 1 局）', () => {
+    const pool = new Pool();
+    const nine = pool.one(kindOf('9s'));
+    const players = [
+      player({ hand: pool.tiles('E S W N Z 147m 258p 36s') }),
+      player({ hand: [...pool.tiles('2468m 1357s 2468p 1p'), nine] }),
+      player({ hand: pool.tiles(JUNK[2]) }),
+      player({ hand: pool.tiles(JUNK[3]) }),
+    ];
+    // 九尾（1 号位）是本局庄家，也是点炮者；铁蛋（2 号位）只是下一局坐庄
+    let s = baseState(players, { turn: 1, dealer: 1 });
+    s = act(s, 1, { type: 'discard', tile: nine.id });
+    s = act(s, 0, { type: 'hu' });
+    expect(s.result!.wins[0].score.fan).toBe(2); // 豪华不搭
+    expect(s.result!.dealer).toBe(1);
+    expect(s.result!.dealerBase).toBe(6);
+    expect(s.result!.nextDealer).toBe(2);
+    expect(s.result!.deltas).toEqual([88, -48, -20, -20]);
+    expect(s.chips).toEqual([138, 2, 30, 30]);
+  });
+
   it('闲家点炮胡：点炮者 10、庄 6、另一闲 5', () => {
     const pool = new Pool();
     const five = pool.one(kindOf('5p'));

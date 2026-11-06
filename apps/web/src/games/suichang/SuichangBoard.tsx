@@ -216,7 +216,7 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
           deadline={ctl.deadlines[s]}
           size={54}
           layout={where === 'top' ? 'row' : 'column'}
-          tag={s === v.dealer ? (v.dealerStreak > 0 ? `庄×${v.dealerStreak + 1}` : '庄') : undefined}
+          tag={s === v.dealer ? '庄' : undefined}
           sub={<span className="num">{v.chips[s]}</span>}
         >
           {p.won && <span className="sz-wonbadge">胡</span>}
@@ -327,7 +327,7 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
             deadline={ctl.deadlines[me]}
             size={48}
             layout="row"
-            tag={me === v.dealer ? (v.dealerStreak > 0 ? `庄×${v.dealerStreak + 1}` : '庄') : undefined}
+            tag={me === v.dealer ? '庄' : undefined}
             sub={<span className="num">{v.chips[me]}</span>}
           />
         </div>
@@ -547,7 +547,10 @@ function RoundResult({
           第 {r.session} 盘 · 第 {r.round} 局 ·{' '}
           {r.reason === 'wall' ? `荒庄（庄家 ${ctl.players[r.dealer].name} 赔 5）` : `${r.wins.length} 家胡牌`}
           {r.jokerKind !== null ? ` · 财神 ${sz.kindName(r.jokerKind)}` : ''}
-          {r.sessionEnded ? ` · 本盘结束（${r.sanqing ? '三清' : '有人清袋'}）` : ` · ${ctl.players[r.nextDealer].name} 坐庄`}
+          {` · 本局庄 ${ctl.players[r.dealer].name}（底分 ${r.dealerBase}）`}
+          {r.sessionEnded
+            ? ` · 本盘结束（${r.sanqing ? '三清' : '有人清袋'}）`
+            : ` · 下局 ${ctl.players[r.nextDealer].name} 坐庄`}
         </div>
         <table className="result__table">
           <thead>
@@ -565,7 +568,7 @@ function RoundResult({
                   <span className="result__who">
                     <Avatar name={ctl.players[s].name} avatar={ctl.players[s].avatar} size={26} />
                     {ctl.players[s].name}
-                    {s === v.dealer && <span className="mini-tag">庄</span>}
+                    {s === r.dealer && <span className="mini-tag">庄·{r.dealerBase}</span>}
                   </span>
                 </td>
                 <td className="sz-res-status">{status(s)}</td>
@@ -577,6 +580,23 @@ function RoundResult({
             ))}
           </tbody>
         </table>
+        {r.ledger.length > 0 && (
+          <details className="sz-ledger">
+            <summary>本局账目（{r.ledger.length} 笔）</summary>
+            <ul>
+              {r.ledger.map((e, i) => (
+                <li key={i}>
+                  <span>{clauseText(e.clause)}</span>
+                  {ctl.players[e.from].name} → {ctl.players[e.to].name}
+                  <b className="num">
+                    {e.due}
+                    {e.actual !== e.due ? `（实付 ${e.actual}）` : ''}
+                  </b>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
         {pending.length > 0 && (
           <div className="sz-pending">
             <b>待结算</b>
