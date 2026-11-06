@@ -18,6 +18,8 @@ export interface HandProps {
   single?: boolean;
   /** 新一局时用于触发发牌动画 */
   dealKey?: string | number;
+  /** 需要高亮的牌（例如刚拿到的底牌） */
+  highlight?: Set<number>;
 }
 
 /** 测量容器宽度 */
@@ -61,6 +63,7 @@ export function Hand({
   disabled,
   single,
   dealKey,
+  highlight,
 }: HandProps) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const cw = useCardWidth(ref.current, width);
@@ -187,6 +190,7 @@ export function Hand({
             className="hand__card"
             selected={sel}
             wild={isWild?.(c)}
+            highlight={highlight?.has(c.id)}
             style={style}
           />
         );

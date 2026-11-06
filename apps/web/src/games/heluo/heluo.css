@@ -1,0 +1,193 @@
+/* 河洛杠次：字牌牌面与次牌标记（其余布局复用四川麻将的 sc-* 样式） */
+
+.hl-honor {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.hl-honor__txt {
+  font-family: 'Songti SC', 'Noto Serif SC', serif;
+  font-size: calc(var(--w) * 0.62);
+  font-weight: 700;
+  line-height: 1;
+  color: #1d2a3a;
+}
+.hl-honor.is-d1 .hl-honor__txt {
+  color: #c0392b;
+}
+.hl-honor.is-d2 .hl-honor__txt {
+  color: #2e7a4f;
+}
+.hl-honor.is-d3 .hl-honor__txt {
+  color: #2a5b8c;
+}
+
+.hl-ci-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.hl-ci-chip .mjtile {
+  margin-bottom: 0;
+}
+
+/* 手里的次牌：金色描边 + 右上角「次」角标 */
+.sc-handtile.is-ci {
+  position: relative;
+}
+.sc-handtile.is-ci .mjtile {
+  outline: 2px solid var(--gold, #d4a24a);
+  outline-offset: -2px;
+}
+.hl-ci-mark {
+  position: absolute;
+  right: -3px;
+  top: -3px;
+  z-index: 2;
+  pointer-events: none;
+  font-size: max(10px, calc(var(--tw) * 0.28));
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+  background: #c0392b;
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.hl-confirm {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.hl-confirm p {
+  margin: 0;
+  color: var(--ink-2, #555);
+}
+
+/* 次牌亮相动画 */
+.hl-reveal {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.45);
+  animation: hl-reveal-fade 2.4s ease forwards;
+  cursor: pointer;
+}
+.hl-reveal__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.hl-reveal__rays {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 340px;
+  height: 340px;
+  margin: -210px 0 0 -170px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(
+    rgba(212, 172, 110, 0.35) 0deg 10deg,
+    transparent 10deg 20deg
+  );
+  mask-image: radial-gradient(circle, #000 20%, transparent 70%);
+  -webkit-mask-image: radial-gradient(circle, #000 20%, transparent 70%);
+  animation: hl-reveal-spin 6s linear infinite;
+  pointer-events: none;
+}
+.hl-reveal__tile {
+  position: relative;
+  perspective: 600px;
+  animation: hl-reveal-pop 0.9s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+.hl-reveal__tile .mjtile {
+  margin-bottom: 0;
+  box-shadow:
+    0 0 0 3px var(--gold, #d4a24a),
+    0 0 28px 6px rgba(212, 172, 110, 0.7);
+}
+.hl-reveal__title {
+  position: relative;
+  color: var(--gold, #d4ac6e);
+  font-size: 15px;
+  letter-spacing: 0.3em;
+  animation: hl-reveal-up 0.5s 0.5s ease both;
+}
+.hl-reveal__name {
+  position: relative;
+  color: #fff;
+  font-size: 28px;
+  font-weight: 700;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  animation: hl-reveal-up 0.5s 0.65s ease both;
+}
+@keyframes hl-reveal-pop {
+  0% {
+    transform: translateY(-40vh) rotateY(180deg) scale(0.4);
+    opacity: 0;
+  }
+  60% {
+    transform: translateY(0) rotateY(0deg) scale(1.25);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes hl-reveal-up {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes hl-reveal-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes hl-reveal-fade {
+  0%,
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hl-reveal,
+  .hl-reveal__tile,
+  .hl-reveal__rays,
+  .hl-reveal__title,
+  .hl-reveal__name {
+    animation: none;
+  }
+}
+
+/* 包次区提醒 */
+.hl-reveal__rays.is-bao {
+  background: repeating-conic-gradient(rgba(214, 88, 64, 0.38) 0deg 10deg, transparent 10deg 20deg);
+}
+.hl-bao-badge {
+  display: grid;
+  place-items: center;
+  width: clamp(72px, 15vmin, 128px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #e0644a, #8f2a1c);
+  color: #fff3dc;
+  font-size: clamp(36px, 8vmin, 64px);
+  font-weight: 800;
+  box-shadow:
+    0 0 0 4px var(--gold, #d4a24a),
+    0 0 32px 8px rgba(214, 88, 64, 0.6);
+}
