@@ -8,6 +8,7 @@ import {
   doudizhu,
   gemguild,
   guandan,
+  hangzhou,
   hexisle,
   highcard,
   onecard,
@@ -83,6 +84,12 @@ describe('大模型接管：候选动作', () => {
     for (let seed = 1; seed <= 4; seed++)
       expect(
         checkPrompts(sichuan, 4, { ...sichuan.defaultOptions, rounds: 1 }, seed),
+      ).toBeGreaterThan(20);
+  });
+  it('杭州麻将', () => {
+    for (let seed = 1; seed <= 4; seed++)
+      expect(
+        checkPrompts(hangzhou, 4, { ...hangzhou.defaultOptions, rounds: 1 }, seed, 3000),
       ).toBeGreaterThan(20);
   });
   it('魔法出包', () => {
