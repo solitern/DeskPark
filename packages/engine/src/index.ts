@@ -17,6 +17,7 @@ import { highcard } from './games/highcard';
 import { onecard } from './games/onecard';
 import { sichuan } from './games/sichuan';
 import { spellstones } from './games/spellstones';
+import { suichang } from './games/suichang';
 import { texas } from './games/texas';
 import { xiangqi } from './games/xiangqi';
 
@@ -26,6 +27,7 @@ export * as tx from './games/texas';
 export * as hc from './games/highcard';
 export * as sc from './games/sichuan';
 export * as hz from './games/hangzhou';
+export * as sz from './games/suichang';
 export * as ss from './games/spellstones';
 export * as oc from './games/onecard';
 export * as hi from './games/hexisle';
@@ -40,6 +42,7 @@ export {
   texas,
   sichuan,
   hangzhou,
+  suichang,
   xiangqi,
   chess,
   spellstones,
@@ -56,6 +59,7 @@ for (const g of [
   texas,
   sichuan,
   hangzhou,
+  suichang,
   xiangqi,
   chess,
   spellstones,

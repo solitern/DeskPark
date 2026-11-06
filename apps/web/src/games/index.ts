@@ -86,6 +86,18 @@ export const GAME_UIS: GameUI[] = [
     people: '4 人 · 白板财神',
   },
   {
+    id: 'suichang',
+    Board: lazy(() => import('./suichang/SuichangBoard')),
+    tint: ['#8a5a3c', '#3f2a1c'],
+    showcase: [],
+    tiles: [
+      { id: 1, suit: 'wan', rank: 5 },
+      { id: 2, suit: 'jian', rank: 3 },
+      { id: 3, suit: 'tong', rank: 9 },
+    ],
+    people: '4 人 · 50 筹码',
+  },
+  {
     id: 'xiangqi',
     Board: lazy(() => import('./xiangqi/XiangqiBoard')),
     tint: ['#b0742f', '#5c3612'],

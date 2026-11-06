@@ -14,6 +14,7 @@ import {
   onecard,
   sichuan,
   spellstones,
+  suichang,
   texas,
   xiangqi,
 } from '../src';
@@ -90,6 +91,12 @@ describe('大模型接管：候选动作', () => {
     for (let seed = 1; seed <= 4; seed++)
       expect(
         checkPrompts(hangzhou, 4, { ...hangzhou.defaultOptions, rounds: 1 }, seed, 3000),
+      ).toBeGreaterThan(20);
+  });
+  it('遂昌麻将', () => {
+    for (let seed = 1; seed <= 4; seed++)
+      expect(
+        checkPrompts(suichang, 4, { ...suichang.defaultOptions }, seed, 3000),
       ).toBeGreaterThan(20);
   });
   it('魔法出包', () => {

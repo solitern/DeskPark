@@ -20,6 +20,7 @@ describe('基础设施', () => {
       'texas',
       'sichuan',
       'hangzhou',
+      'suichang',
       'xiangqi',
       'chess',
       'spellstones',
