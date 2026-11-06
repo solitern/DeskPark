@@ -1,15 +1,9 @@
-import { KINDS, NUMBER_SUITS, countKinds, kindSuit } from '../../mahjong/tiles136';
-import {
-  isSevenPairs,
-  pungWinWithJokers,
-  sevenPairsWithJokers,
-  splitJokers,
-  total,
-  winWithJokers,
-} from '../../mahjong/analysis136';
-import type { HzTile } from '../../mahjong/tiles136';
-import { BUDA_FAN, BUDA_NAME, nonMeldWin } from './analysis';
+import { KINDS, NUMBER_SUITS, kindSuit } from '../../mahjong/tiles136';
+import { pungWinRaw, sevenPairsRaw, standardWinRaw, total } from '../../mahjong/analysis136';
+import { BUDA_FAN, BUDA_NAME, isSevenWinds, nonMeldWin } from './analysis';
 import type { BuDaClass } from './analysis';
+import { splitTiles } from './tiles';
+import type { Tile } from './tiles';
 
 /**
  * 遂昌麻将的番型与计分。
@@ -31,6 +25,8 @@ export type FanId =
   | 'buda_regular'
   | 'buda_luxury'
   | 'buda_ultra'
+  | 'qifeng'
+  | 'quanluodi'
   | 'zimo'
   | 'gangshanghua'
   | 'tianhu'
@@ -49,6 +45,8 @@ export const FAN_NAME: Record<FanId, string> = {
   buda_regular: '正规不搭',
   buda_luxury: '豪华不搭',
   buda_ultra: '超豪华不搭',
+  qifeng: '七风',
+  quanluodi: '全落地',
   zimo: '自摸',
   gangshanghua: '杠上开花',
   tianhu: '天胡',
@@ -97,15 +95,11 @@ export const WALL_RESERVE = 34;
 
 export const scoreOf = (fan: number): number => 2 ** fan;
 
-/** 手牌与副露里出现的花色（财神不算） */
-function suitsOfHand(
-  counts: readonly number[],
-  melds: readonly MeldShape[],
-  jokerKind: number | null,
-): Set<string> {
+/** 手牌与副露里出现的花色 */
+function suitsOfHand(counts: readonly number[], melds: readonly MeldShape[]): Set<string> {
   const suits = new Set<string>();
   for (let k = 0; k < KINDS; k++) {
-    if (counts[k] > 0 && k !== jokerKind) suits.add(kindSuit(k));
+    if (counts[k] > 0) suits.add(kindSuit(k));
   }
   for (const m of melds) suits.add(kindSuit(m.kind));
   return suits;
@@ -116,29 +110,28 @@ function suitsOfHand(
  * 爆头、飞财、天胡 / 地胡由调用方在 ctx 里给出。
  */
 export function evaluateWin(
-  concealed: readonly HzTile[],
+  concealed: readonly Tile[],
   melds: readonly MeldShape[],
   jokerKind: number | null,
   ctx: WinContext,
 ): WinScore | null {
-  const counts = countKinds(concealed);
+  const { real, jokers } = splitTiles(concealed, jokerKind);
   const meldCount = melds.length;
   const setsNeeded = 4 - meldCount;
   const items: FanItem[] = [];
   let buda: BuDaClass | null = null;
 
   if (meldCount === 0) {
-    buda = nonMeldWin(counts, jokerKind);
+    buda = nonMeldWin(real, jokers);
   }
 
   if (!buda) {
-    if (!winWithJokers(counts, jokerKind, setsNeeded)) return null;
-    const qidui =
-      meldCount === 0 &&
-      (jokerKind !== null ? sevenPairsWithJokers(counts, jokerKind) : isSevenPairs(counts, 0));
-    const haohua = qidui && counts.some((n, k) => n >= 4 && k !== jokerKind);
-    const pengpeng = pungWinWithJokers(counts, jokerKind, setsNeeded);
-    const suits = suitsOfHand(counts, melds, jokerKind);
+    const qidui = meldCount === 0 && sevenPairsRaw(real, jokers);
+    if (!standardWinRaw(real, jokers, setsNeeded) && !qidui) return null;
+    const haohua = qidui && real.some((n) => n >= 4);
+    const pengpeng =
+      melds.every((m) => m.type !== 'chi') && pungWinRaw(real, jokers, setsNeeded);
+    const suits = suitsOfHand(real, melds);
     const numberSuits = [...suits].filter((s) =>
       (NUMBER_SUITS as readonly string[]).includes(s),
     );
@@ -170,7 +163,13 @@ export function evaluateWin(
       id: buda === 'ordinary' ? 'pinghu' : `buda_${buda}`,
       fan: BUDA_FAN[buda],
     });
+    // 七风：不搭手里东南西北中发白七张字牌齐全
+    if (buda === 'ordinary' && isSevenWinds(real, jokers, jokerKind))
+      items.push({ id: 'qifeng', fan: 1 });
   }
+
+  // 全落地：吃碰杠之后手牌只剩一张（4 组副露 + 将）
+  if (meldCount === 4) items.push({ id: 'quanluodi', fan: 1 });
 
   if (ctx.explosive) items.push({ id: 'baotou', fan: 1 });
   if (ctx.tianhu) items.push({ id: 'tianhu', fan: 2 });
@@ -198,4 +197,4 @@ export function robAmount(score: WinScore): number {
 /** 不搭展示名 */
 export const budaName = (cls: BuDaClass) => BUDA_NAME[cls];
 
-export { total, splitJokers };
+export { total };

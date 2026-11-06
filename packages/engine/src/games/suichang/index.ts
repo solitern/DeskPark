@@ -2,18 +2,22 @@ import { clone } from '../../core/clone';
 import { Rng } from '../../core/rng';
 import type { GameDefinition, Seat } from '../../core/types';
 import {
-  countKinds,
   createTiles,
   hzKindOf,
-  hzTileOf,
   isHonor,
+  kindRank,
+  kindSuit,
   sortTiles,
 } from '../../mahjong/tiles136';
-import type { HzTile } from '../../mahjong/tiles136';
 import { explosiveWait, waits } from './analysis';
 import { szAiPrompt } from './ai';
 import { suichangBot } from './bot';
 import type { MeldShape, WinScore } from './scoring';
+import {
+  JIAN_BAI,
+  splitTiles,
+  type Tile,
+} from './tiles';
 import {
   BASE_SCORE,
   DEALER_BASE,
@@ -29,11 +33,14 @@ export * from './tiles';
 export * from './analysis';
 export * from './scoring';
 
+type HzTile = Tile;
+
 /**
  * 遂昌麻将（规则版本 suichang-1）。
  *
- * 136 张、四人。翻财神：从牌墙尾翻一张，翻到的牌的种类即财神，翻开的那张移出牌墙，
- * 所以场上只剩 3 张财神；财神可当任意牌胡（可做将），不能碰杠吃，可以打出（飞财）。
+ * 136 张、四人。翻财神：从牌墙尾翻一张，翻到的牌的种类就是财神；翻开的这张移出牌墙，
+ * 所以该种类剩 3 张，这 3 张是万能牌（可当任意牌、可做将、不能碰杠吃、可打出飞财）。
+ * 白板则全部变成该种类的普通牌（例如翻到一万，4 张白板都当一万，可以吃碰杠、可以点炮）。
  * 飞财后下、对、上家各摸一次的「一圈」内，所有人只能摸牌进张、只能自摸；
  * 飞财者本人下一次摸牌自摸 +1 番。
  *
@@ -190,6 +197,7 @@ export interface SzState {
   /** 留底的 34 张（荒庄判定用，不参与摸牌） */
   reserve: HzTile[];
   flip: HzTile | null;
+  /** 本局财神：翻出的牌的种类（3 张）；白板替身为该种类的普通牌 */
   jokerKind: number | null;
   players: SzPlayer[];
   turn: Seat;
@@ -327,8 +335,7 @@ function activeSeats(state: SzState): Seat[] {
   return [state.turn];
 }
 
-const isJokerKind = (state: SzState, kind: number) =>
-  state.jokerKind !== null && kind === state.jokerKind;
+const isJoker = (t: Pick<Tile, 'joker'>) => !!t.joker;
 
 /** 和牌评估（`tile` 为和进的那张；自摸传 null） */
 function scoreFor(
@@ -363,23 +370,23 @@ function isTianhu(state: SzState, seat: Seat, p: SzPlayer): boolean {
 function explosiveOf(state: SzState, p: SzPlayer): boolean {
   if (state.jokerKind === null || state.drawn === null) return false;
   const pre = p.hand.filter((t) => t.id !== state.drawn);
-  return explosiveWait(countKinds(pre), state.jokerKind, p.melds.length);
+  const { real, jokers } = splitTiles(pre, state.jokerKind);
+  return explosiveWait(real, jokers, p.melds.length);
 }
 
 /** 这张牌能不能点炮胡（爆头不能点炮） */
 function canRon(state: SzState, p: SzPlayer, tile: HzTile): boolean {
-  if (explosiveWait(countKinds(p.hand), state.jokerKind, p.melds.length)) return false;
+  const { real, jokers } = splitTiles(p.hand, state.jokerKind);
+  if (explosiveWait(real, jokers, p.melds.length)) return false;
   return !!scoreFor(state, p, tile, false);
 }
 
-function chiPairs(hand: readonly HzTile[], tile: HzTile, jokerKind: number | null): number[][] {
+function chiPairs(hand: readonly HzTile[], tile: HzTile): number[][] {
   const kind = hzKindOf(tile);
   if (isHonor(kind)) return [];
   const out: number[][] = [];
   const pick = (rank: number) =>
-    hand.filter(
-      (t) => t.suit === tile.suit && t.rank === rank && !(jokerKind !== null && hzKindOf(t) === jokerKind),
-    );
+    hand.filter((t) => t.suit === tile.suit && t.rank === rank && !isJoker(t));
   for (const [a, b] of [
     [tile.rank - 2, tile.rank - 1],
     [tile.rank - 1, tile.rank + 1],
@@ -396,6 +403,20 @@ function chiPairs(hand: readonly HzTile[], tile: HzTile, jokerKind: number | nul
 // ---------------------------------------------------------------------------
 // 发牌与推进
 
+/** 发牌后处理财神：翻出的种类标记为万能牌；白板改成该种类的普通牌 */
+function prepareTiles(tiles: readonly Tile[], flipKind: number): Tile[] {
+  const targetSuit = kindSuit(flipKind);
+  const targetRank = kindRank(flipKind);
+  return tiles.map((t) => {
+    const face = hzKindOf(t);
+    if (face === flipKind) return { ...t, joker: true };
+    if (face === JIAN_BAI && flipKind !== JIAN_BAI) {
+      return { ...t, suit: targetSuit, rank: targetRank, sub: true, joker: false };
+    }
+    return t;
+  });
+}
+
 function deal(state: SzState): void {
   const rng = new Rng(state.rng);
   const wall = rng.shuffle(createTiles());
@@ -405,7 +426,7 @@ function deal(state: SzState): void {
   for (let i = 0; i < 13; i++)
     for (let s = 0; s < N; s++) state.players[(state.dealer + s) % N].hand.push(wall.shift()!);
   state.players[state.dealer].hand.push(wall.shift()!);
-  // 翻财神：从牌墙尾翻一张，翻到的牌的种类就是财神
+  // 翻财神：从牌墙尾翻一张，翻到的牌的种类就是财神（3 张万能牌）；白板替成这一张
   state.flip = null;
   state.jokerKind = null;
   if (state.options.joker && wall.length > 0) {
@@ -415,6 +436,12 @@ function deal(state: SzState): void {
   // 留最后 34 张不摸（线下「摸完 3 个牌堆」即荒庄）
   state.reserve = wall.splice(Math.max(0, wall.length - WALL_RESERVE), WALL_RESERVE);
   state.wall = wall;
+  if (state.jokerKind !== null) {
+    const fk = state.jokerKind;
+    for (const p of state.players) p.hand = prepareTiles(p.hand, fk);
+    state.wall = prepareTiles(state.wall, fk);
+    state.reserve = prepareTiles(state.reserve, fk);
+  }
   state.turn = state.dealer;
   state.drawn = null;
   state.canSelfHu = true;
@@ -565,7 +592,7 @@ function openClaims(state: SzState, discarder: Seat, tile: HzTile): void {
     return;
   }
   const kind = hzKindOf(tile);
-  if (isJokerKind(state, kind)) {
+  if (isJoker(tile)) {
     advance(state, discarder);
     return;
   }
@@ -586,13 +613,13 @@ function openClaims(state: SzState, discarder: Seat, tile: HzTile): void {
     w.required[s] = true;
     const opts: WindowOpt[] = [];
     if (s === huSeat) opts.push('hu');
-    const natural = p.hand.filter((t) => hzKindOf(t) === kind).length;
+    const natural = p.hand.filter((t) => hzKindOf(t) === kind && !isJoker(t)).length;
     if (natural >= 3 && canDraw(state)) opts.push('gang');
     if (natural >= 2) opts.push('peng');
     if (
       state.options.chi &&
       s === nextSeat(discarder) &&
-      chiPairs(p.hand, tile, state.jokerKind).length > 0
+      chiPairs(p.hand, tile).length > 0
     )
       opts.push('chi');
     if (opts.length === 0) {
@@ -675,7 +702,7 @@ function resolveWindow(state: SzState): void {
   const gangSeat = order.find((s) => dec(s)?.type === 'gang');
   if (gangSeat !== undefined) {
     const p = state.players[gangSeat];
-    const own = p.hand.filter((t) => hzKindOf(t) === kind).slice(0, 3);
+    const own = p.hand.filter((t) => hzKindOf(t) === kind && !isJoker(t)).slice(0, 3);
     const ids = new Set(own.map((t) => t.id));
     p.hand = p.hand.filter((t) => !ids.has(t.id));
     p.melds.push({ type: 'kong', kongType: 'zhi', kind, tiles: [...own, tile], from: source });
@@ -689,7 +716,7 @@ function resolveWindow(state: SzState): void {
   const pengSeat = order.find((s) => dec(s)?.type === 'peng');
   if (pengSeat !== undefined) {
     const p = state.players[pengSeat];
-    const own = p.hand.filter((t) => hzKindOf(t) === kind).slice(0, 2);
+    const own = p.hand.filter((t) => hzKindOf(t) === kind && !isJoker(t)).slice(0, 2);
     const ids = new Set(own.map((t) => t.id));
     p.hand = p.hand.filter((t) => !ids.has(t.id));
     p.melds.push({ type: 'pung', kind, tiles: [...own, tile], from: source });
@@ -755,7 +782,7 @@ export function legalActions(state: SzState, seat: Seat): SzLegal | null {
     L.pass = opts.includes('pass');
     L.peng = opts.includes('peng');
     if (opts.includes('gang')) L.gang = [{ tile: w.tile!.id, type: 'zhi' }];
-    if (opts.includes('chi') && w.tile) L.chi = chiPairs(p.hand, w.tile, state.jokerKind);
+    if (opts.includes('chi') && w.tile) L.chi = chiPairs(p.hand, w.tile);
     return L;
   }
   if (state.turn !== seat) return null;
@@ -772,14 +799,16 @@ export function legalActions(state: SzState, seat: Seat): SzLegal | null {
     L.hu = !!score;
   }
   if (canDraw(state)) {
-    const counts = countKinds(p.hand);
+    const normal = new Array<number>(34).fill(0);
+    for (const t of p.hand) if (!isJoker(t)) normal[hzKindOf(t)]++;
     for (let k = 0; k < 34; k++) {
-      if (counts[k] !== 4 || isJokerKind(state, k)) continue;
-      L.gang.push({ tile: p.hand.find((t) => hzKindOf(t) === k)!.id, type: 'an' });
+      if (normal[k] !== 4) continue;
+      const t = p.hand.find((x) => !isJoker(x) && hzKindOf(x) === k)!;
+      L.gang.push({ tile: t.id, type: 'an' });
     }
     for (const m of p.melds) {
-      if (m.type !== 'pung' || isJokerKind(state, m.kind)) continue;
-      const t = p.hand.find((x) => hzKindOf(x) === m.kind);
+      if (m.type !== 'pung') continue;
+      const t = p.hand.find((x) => !isJoker(x) && hzKindOf(x) === m.kind);
       if (t) L.gang.push({ tile: t.id, type: 'ba' });
     }
   }
@@ -803,13 +832,35 @@ function cleanAction(a: SzAction): SzAction {
 export function currentWaits(state: SzState, seat: Seat): number[] {
   const p = state.players[seat];
   if (p.hand.length % 3 !== 1) return [];
-  return waits(countKinds(p.hand), state.jokerKind, p.melds.length);
+  const { real, jokers } = splitTiles(p.hand, state.jokerKind);
+  return waits(real, jokers, state.jokerKind, p.melds.length);
 }
 
 export function waitsAfter(state: SzState, seat: Seat, tileId: number): number[] {
   const p = state.players[seat];
   const rest = p.hand.filter((t) => t.id !== tileId);
-  return waits(countKinds(rest), state.jokerKind, p.melds.length);
+  const { real, jokers } = splitTiles(rest, state.jokerKind);
+  return waits(real, jokers, state.jokerKind, p.melds.length);
+}
+
+/** 手牌是否爆头（白板替身不算财神） */
+export function isExplosiveHand(
+  hand: readonly Tile[],
+  jokerKind: number | null,
+  melds: number,
+): boolean {
+  const { real, jokers } = splitTiles(hand, jokerKind);
+  return explosiveWait(real, jokers, melds);
+}
+
+/** 手牌听牌（给界面用，自动拆出财神） */
+export function handWaits(
+  hand: readonly Tile[],
+  jokerKind: number | null,
+  melds: number,
+): number[] {
+  const { real, jokers } = splitTiles(hand, jokerKind);
+  return waits(real, jokers, jokerKind, melds);
 }
 
 export const suichang: GameDefinition<SzState, SzAction, SzView, SzOptions> = {
@@ -825,11 +876,11 @@ export const suichang: GameDefinition<SzState, SzAction, SzView, SzOptions> = {
     botDelayMs: [450, 950],
     rules: [
       '遂昌麻将（规则版本 suichang-1）：136 张牌（万、条、筒、东南西北、中发白），四人，可以吃上家的牌。',
-      '翻财神：从牌墙尾翻一张，翻到的牌的种类就是财神（四个都是财神，但翻开的这张移出牌墙，所以场上只剩 3 张）。财神可当任意牌胡（可做将、可单吊），不能碰杠吃。',
+      '翻财神：从牌墙尾翻一张，翻到的牌的种类就是财神；翻开的这张移出牌墙，所以该种类只剩 3 张万能牌（可当任意牌胡、可做将、可单吊，不能碰杠吃）。白板全部变成该种类的普通牌（例如翻到一万，4 张白板都当一万，可以吃碰杠、可以点炮；翻到白板时则 3 张白板是万能牌）。',
       '飞财：主动打出财神叫飞财。飞财后下、对、上家各摸一次的「一圈」内，所有人只能摸牌进张、只能自摸，不能吃碰、明杠、抢杠和点炮胡；暗杠、补杠可以。飞财者本人下一次摸牌自摸 +1 番。',
       '行牌：只能吃上家；碰、明杠、暗杠、补杠；杠后从牌墙尾补牌；补杠可以被抢杠；多人能胡时截胡，只算离出牌者最近的一家，其余两家仍各付一份。',
-      '胡牌：4 面子 + 1 将、七对、豪华七对、清一色、混一色、碰碰胡、字一色、不搭（普通 / 正规 / 豪华 / 超豪华）；一家胡牌本局结束。',
-      '平胡 0 番 = 1 倍，倍数 = 2^番，不封顶；碰碰胡、混一色、七对各 +1，清一色 +2，字一色 +3（可叠碰碰胡），豪华七对 +1（七对共 2 番），不搭正规 +1 / 豪华 +2 / 超豪华 +3。',
+      '胡牌：4 面子 + 1 将、七对、豪华七对、清一色、混一色、碰碰胡、字一色、不搭（普通 / 正规 / 豪华 / 超豪华 / 七风）、全落地（吃碰杠后手牌只剩一张）；一家胡牌本局结束。',
+      '平胡 0 番 = 1 倍，倍数 = 2^番，不封顶；碰碰胡、混一色、七对各 +1，清一色 +2，字一色 +3（可叠碰碰胡），豪华七对 +1（七对共 2 番），不搭正规 +1 / 豪华 +2 / 超豪华 +3，七风 +1（七张字牌齐全，不能用财神补缺），全落地 +1。',
       '过程番：自摸 +1、杠上开花 +1、天胡 / 地胡 +2（不再叠自摸）、飞财自摸 +1、爆头 +1（财神做将，只能自摸，不能点炮）。',
       '付款：自摸三家各付；点炮者付双份、其余两家各付一份；底分 5，涉及庄家时按庄家底分（6 / 8 / 10…，连庄 +2，无上限）。',
       '抢杠承包：抢杠胡只有被抢杠的人付，底分按 50、按牌型番翻倍，等一盘结束再结算。',
@@ -851,7 +902,12 @@ export const suichang: GameDefinition<SzState, SzAction, SzView, SzOptions> = {
       ],
     },
     { key: 'chi', label: '可以吃', hint: '吃上家打出的牌', type: 'toggle' },
-    { key: 'joker', label: '翻财神', hint: '从牌墙尾翻一张，翻到的牌为财神', type: 'toggle' },
+    {
+      key: 'joker',
+      label: '翻财神',
+      hint: '翻出的 3 张为万能财神，白板变成翻出的那张普通牌',
+      type: 'toggle',
+    },
   ],
 
   setup({ options, seed }) {
@@ -922,9 +978,8 @@ export const suichang: GameDefinition<SzState, SzAction, SzView, SzOptions> = {
       case 'gang': {
         if (state.window) return L.gang.length ? null : '不能杠';
         const t = p.hand.find((x) => x.id === action.tile);
-        if (!t) return '请选择要杠的牌';
-        const kind = hzKindOf(t);
-        return L.gang.some((g) => hzKindOf(hzTileOf(g.tile)) === kind) ? null : '不能杠';
+        if (!t || isJoker(t)) return '请选择要杠的牌';
+        return L.gang.some((g) => g.tile === t.id) ? null : '不能杠';
       }
       case 'pass':
         return L.pass ? null : '现在不能过';
@@ -964,7 +1019,7 @@ export const suichang: GameDefinition<SzState, SzAction, SzView, SzOptions> = {
         state.afterKong = false;
         state.dihuChance = false;
         state.flyBonus[seat] = false;
-        if (state.jokerKind !== null && hzKindOf(tile) === state.jokerKind) {
+        if (isJoker(tile)) {
           state.fly = { seat, left: 3 };
           state.flyBonus[seat] = true;
           pushEvent(state, { type: 'fly', seat });
@@ -1005,6 +1060,7 @@ export const suichang: GameDefinition<SzState, SzAction, SzView, SzOptions> = {
           return state;
         }
         const target = p.hand.find((t) => t.id === action.tile)!;
+        if (isJoker(target)) return state;
         const kind = hzKindOf(target);
         const pung = p.melds.find((m) => m.type === 'pung' && m.kind === kind);
         if (pung) {
@@ -1038,8 +1094,8 @@ export const suichang: GameDefinition<SzState, SzAction, SzView, SzOptions> = {
           }
           return state;
         }
-        const four = p.hand.filter((t) => hzKindOf(t) === kind);
-        p.hand = p.hand.filter((t) => hzKindOf(t) !== kind);
+        const four = p.hand.filter((t) => hzKindOf(t) === kind && !isJoker(t));
+        p.hand = p.hand.filter((t) => !(hzKindOf(t) === kind && !isJoker(t)));
         p.melds.push({ type: 'kong', kongType: 'an', kind, tiles: four, from: null });
         state.drawn = null;
         state.canSelfHu = false;
@@ -1124,16 +1180,15 @@ export const suichang: GameDefinition<SzState, SzAction, SzView, SzOptions> = {
 
 function visibleCounts(state: SzState, viewer: Seat | null): number[] {
   const c = new Array<number>(34).fill(0);
-  const seen = new Set<number>();
+  const add = (t: Tile) => c[hzKindOf(t)]++;
   state.players.forEach((p, s) => {
     const hideAnKong = state.phase === 'play' && s !== viewer;
     for (const m of p.melds) {
       if (hideAnKong && m.kongType === 'an') continue;
-      for (const t of m.tiles) seen.add(t.id);
+      for (const t of m.tiles) add(t);
     }
-    for (const r of p.river) seen.add(r.tile.id);
-    if (s === viewer || state.phase !== 'play') for (const t of p.hand) seen.add(t.id);
+    for (const r of p.river) add(r.tile);
+    if (s === viewer || state.phase !== 'play') for (const t of p.hand) add(t);
   });
-  for (const id of seen) c[hzKindOf(hzTileOf(id))]++;
   return c;
 }

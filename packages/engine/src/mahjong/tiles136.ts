@@ -83,10 +83,19 @@ export function countKinds(tiles: readonly Pick<HzTile, 'suit' | 'rank'>[]): num
 }
 
 /** 手牌排序：万条筒在前、字牌在后；同一门按点数与 id。财神始终放在最后，便于辨认。 */
-export function sortTiles(tiles: readonly HzTile[], jokerKind: number | null = null): HzTile[] {
+export function sortTiles(
+  tiles: readonly HzTile[],
+  jokerKind: number | readonly number[] | null = null,
+): HzTile[] {
+  const jokers =
+    jokerKind === null
+      ? []
+      : typeof jokerKind === 'number'
+        ? [jokerKind]
+        : [...jokerKind];
   const order = (t: HzTile) => {
     const k = hzKindOf(t);
-    if (jokerKind !== null && k === jokerKind) return 2;
+    if (jokers.includes(k)) return 2;
     return isHonor(k) ? 1 : 0;
   };
   return [...tiles].sort(

@@ -328,6 +328,10 @@ export interface MahjongTileProps extends HTMLAttributes<HTMLDivElement> {
   highlight?: boolean;
   /** 定缺花色标记 */
   que?: boolean;
+  /** 角标文字（例如财神「财」） */
+  badge?: string;
+  /** 财神光圈 */
+  joker?: boolean;
 }
 
 const SUIT_LABEL: Record<string, string> = { wan: '万', tiao: '条', tong: '筒', feng: '风', jian: '箭' };
@@ -340,6 +344,8 @@ export const MahjongTile = memo(function MahjongTile({
   dim,
   highlight,
   que,
+  badge,
+  joker,
   className = '',
   style,
   ...rest
@@ -350,6 +356,7 @@ export const MahjongTile = memo(function MahjongTile({
     selected ? 'is-selected' : '',
     dim ? 'is-dim' : '',
     highlight ? 'is-highlight' : '',
+    joker ? 'is-joker-glow' : '',
     className,
   ]
     .filter(Boolean)
@@ -360,6 +367,7 @@ export const MahjongTile = memo(function MahjongTile({
     <div className={cls} style={s} role="img" aria-label={label} {...rest}>
       {tile && !faceDown && <TileFace tile={tile} />}
       {que && <span className="mjtile__que">缺</span>}
+      {badge && !faceDown && <span className="mjtile__badge">{badge}</span>}
     </div>
   );
 });

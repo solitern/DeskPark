@@ -97,6 +97,44 @@
   font-weight: 700;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
+/* 财神角标：让万能牌一眼可辨 */
+.mjtile__badge {
+  position: absolute;
+  z-index: 4;
+  right: calc(var(--w) * -0.16);
+  top: calc(var(--w) * -0.16);
+  display: grid;
+  place-items: center;
+  min-width: calc(var(--w) * 0.42);
+  height: calc(var(--w) * 0.42);
+  padding: 0 2px;
+  border-radius: 99px;
+  background: linear-gradient(180deg, #ffe8a8, #d8a94a);
+  color: #3a2606;
+  font-family: var(--font-display);
+  font-size: max(9px, calc(var(--w) * 0.28));
+  font-weight: 800;
+  line-height: 1;
+  box-shadow:
+    0 0 0 1px rgba(92, 62, 16, 0.55),
+    0 2px 6px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+.mjtile.is-sub .mjtile__badge {
+  background: linear-gradient(180deg, #fbf8ef, #d9d0bd);
+  color: #5a4a2e;
+  box-shadow:
+    0 0 0 1px rgba(90, 74, 46, 0.5),
+    0 2px 5px rgba(0, 0, 0, 0.3);
+}
+.mjtile.is-joker-glow {
+  box-shadow:
+    0 0 0 2px #f4d68b,
+    0 0 12px rgba(244, 214, 139, 0.85),
+    0 calc(var(--w) * 0.07) 0 var(--tile-edge),
+    0 calc(var(--w) * 0.12) 0 var(--tile-back-1),
+    0 calc(var(--w) * 0.12 + 2px) 6px rgba(0, 0, 0, 0.3);
+}
 
 .suit-badge {
   display: inline-grid;

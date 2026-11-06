@@ -25,11 +25,13 @@ export function szAiPrompt(view: SzView, seat: Seat, rng: Rng): AiPrompt<SzActio
   const rec = suichangBot(view, seat, rng);
   const me = view.players[seat];
   const lines = [
-    '遂昌麻将：可以吃上家的牌；翻财神，财神可以当任意牌胡，但不能碰杠吃。',
+    '遂昌麻将：可以吃上家的牌；翻财神，翻出的 3 张是万能财神，白板替成翻出的那张（普通牌），财神不能碰杠吃。',
     `第 ${view.session} 盘第 ${view.round} 局，每人 50 筹码；底分 5，庄家底分 ${view.dealerBase}。`,
   ];
   if (view.jokerKind !== null)
-    lines.push(`财神：${kindName(view.jokerKind)}（翻出的指示牌 ${view.flip ? tileName(view.flip) : '—'}）`);
+    lines.push(
+      `财神：${kindName(view.jokerKind)}（3 张万能牌；白板当${kindName(view.jokerKind)}，是普通牌）`,
+    );
   if (view.fly) lines.push(`飞财中：${seatName(seat, view.fly.seat, 4)} 飞了财神，这一圈只能自摸。`);
   lines.push(`你的手牌：${tilesText(view.hand)}`);
   if (me.melds.length) lines.push(`你的副露：${me.melds.map(meldText).join('，')}`);

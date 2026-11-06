@@ -67,15 +67,20 @@ function River({
 }) {
   return (
     <div className={`sz-river is-${pos}`}>
-      {river.map((r) => (
-        <MahjongTile
-          key={r.tile.id}
-          tile={r.tile}
-          w="var(--rw)"
-          highlight={r.tile.id === lastId}
-          className={r.claimedBy?.length ? 'is-claimed' : ''}
-        />
-      ))}
+      {river.map((r) => {
+        const joker = !!r.tile.joker;
+        return (
+          <MahjongTile
+            key={r.tile.id}
+            tile={r.tile}
+            w="var(--rw)"
+            highlight={r.tile.id === lastId}
+            badge={joker ? '财' : r.tile.sub ? '白' : undefined}
+            joker={joker}
+            className={`${r.claimedBy?.length ? 'is-claimed' : ''} ${r.tile.sub ? 'is-sub' : ''}`}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -90,11 +95,26 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
   const mine = v.players[me];
   const jokerKind = v.jokerKind;
   const [sel, setSel] = useState<number[]>([]);
+  const [confirmDiscard, setConfirmDiscard] = useState<number | null>(null);
   const [rootRef, width] = useWidth<HTMLDivElement>();
   const actRef = useRef<HTMLDivElement>(null);
 
   const phaseKey = `${v.session}-${v.round}-${v.phase}-${mine.handCount}-${v.drawn}`;
-  useEffect(() => setSel([]), [phaseKey]);
+  useEffect(() => {
+    setSel([]);
+    setConfirmDiscard(null);
+  }, [phaseKey]);
+
+  // 刚能胡牌时给一次明显提示（音效 + toast），避免错过
+  const huSeen = useRef(false);
+  useEffect(() => {
+    const canHu = !!L?.hu;
+    if (canHu && !huSeen.current) {
+      playSound('win');
+      toast('可以胡牌！点金色的「胡」');
+    }
+    huSeen.current = canHu;
+  }, [L?.hu]);
 
   const myTurn =
     !!L && (L.discard.length > 0 || L.hu || L.gang.length > 0 || L.peng || L.chi.length > 0);
@@ -129,11 +149,10 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
 
   const explosiveNow = useMemo(() => {
     if (v.phase !== 'play') return false;
-    if (v.hand.length % 3 === 1)
-      return sz.explosiveWait(sz.countKinds(v.hand), jokerKind, mine.melds.length);
+    if (v.hand.length % 3 === 1) return sz.isExplosiveHand(v.hand, jokerKind, mine.melds.length);
     if (drawnTile) {
       const pre = v.hand.filter((t) => t.id !== drawnTile.id);
-      return sz.explosiveWait(sz.countKinds(pre), jokerKind, mine.melds.length);
+      return sz.isExplosiveHand(pre, jokerKind, mine.melds.length);
     }
     return false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -141,14 +160,14 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
 
   const waitsNow = useMemo(() => {
     if (v.phase !== 'play' || v.window || v.hand.length % 3 !== 1) return [];
-    return sz.waits(sz.countKinds(v.hand), jokerKind, mine.melds.length);
+    return sz.handWaits(v.hand, jokerKind, mine.melds.length);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctl.version]);
 
   const previewWaits = useMemo(() => {
     if (sel.length !== 1) return waitsNow;
     const rest = v.hand.filter((t) => t.id !== sel[0]);
-    return sz.waits(sz.countKinds(rest), jokerKind, mine.melds.length);
+    return sz.handWaits(rest, jokerKind, mine.melds.length);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sel, ctl.version]);
 
@@ -158,12 +177,18 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
     else setSel([]);
   };
 
-  const isJoker = (t: Tile) => jokerKind !== null && sz.hzKindOf(t) === jokerKind;
+  const isJoker = (t: Tile) => !!t.joker;
 
+  /** 可以胡的时候，双击手牌不再直接打出，先确认，避免误打 */
   const onTile = (t: Tile) => {
     if (!L || !L.discard.includes(t.id)) return;
-    if (sel[0] === t.id) act({ type: 'discard', tile: t.id });
-    else {
+    if (sel[0] === t.id) {
+      if (L.hu) {
+        setConfirmDiscard(t.id);
+        return;
+      }
+      act({ type: 'discard', tile: t.id });
+    } else {
       setSel([t.id]);
       playSound('select');
     }
@@ -197,10 +222,17 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
     return (
       <div
         key={t.id}
-        className={`sz-handtile ${joker ? 'is-joker' : ''}`}
+        className={`sz-handtile ${joker ? 'is-joker' : ''} ${t.sub ? 'is-sub' : ''}`}
+        title={t.sub && jokerKind !== null ? `白板当${sz.kindName(jokerKind)}` : undefined}
         onClick={() => onTile(t)}
       >
-        <MahjongTile tile={t} selected={sel.includes(t.id)} />
+        <MahjongTile
+          tile={t}
+          selected={sel.includes(t.id)}
+          badge={joker ? '财' : t.sub ? '白' : undefined}
+          joker={joker}
+          className={t.sub ? 'is-sub' : undefined}
+        />
       </div>
     );
   };
@@ -245,6 +277,8 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
   const lastDiscard = v.window?.tile?.id ?? v.lastDiscard?.id ?? null;
   const turnPos = v.window ? pos(v.window.source ?? v.turn ?? me) : v.turn !== null ? pos(v.turn) : null;
   const jokerName = jokerKind !== null ? sz.kindName(jokerKind) : null;
+  const confirmTile =
+    confirmDiscard !== null ? (v.hand.find((t) => t.id === confirmDiscard) ?? null) : null;
   const flySeat = v.fly?.seat ?? null;
 
   return (
@@ -262,11 +296,27 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
         <span className="chip">
           底分 <b className="num">{v.dealerBase}</b>
         </span>
-        {v.flip && jokerName && (
-          <span className="chip is-gold sz-jokerchip" title={`翻出 ${sz.tileName(v.flip)}，${jokerName}为财神`}>
+        {jokerName && jokerKind !== null && (
+          <span
+            className="chip is-gold sz-jokerchip"
+            title={`翻出 ${v.flip ? sz.tileName(v.flip) : '—'}；本局财神：${jokerName}（3 张万能牌）${jokerKind !== 33 ? `；白板当${jokerName}` : ''}`}
+          >
             财神
-            <MahjongTile tile={v.flip} w="16px" />
+            <MahjongTile
+              tile={{ id: -jokerKind - 1, suit: sz.kindSuit(jokerKind), rank: sz.kindRank(jokerKind) }}
+              w="18px"
+              badge="财"
+            />
+            {jokerKind !== 33 && (
+              <MahjongTile
+                tile={{ id: -100, suit: sz.kindSuit(33), rank: sz.kindRank(33) }}
+                w="18px"
+                badge="白"
+                className="is-sub"
+              />
+            )}
             <b>{jokerName}</b>
+            {jokerKind !== 33 && <small>白板当{jokerName}</small>}
           </span>
         )}
         {v.fly && (
@@ -332,6 +382,26 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
           />
         </div>
         <div className="sz-actions">
+          {!spectator && L?.hu && v.phase === 'play' && (
+            <div className="sz-hu-callout">
+              <span>
+                {v.window?.kind === 'rob'
+                  ? '可以抢杠胡！'
+                  : explosiveNow
+                    ? '可以爆头！'
+                    : '可以胡牌！'}
+              </span>
+              <Button variant="gold" className="sz-hu-btn" onClick={() => act({ type: 'hu' })}>
+                {v.window?.kind === 'rob'
+                  ? '抢杠胡'
+                  : explosiveNow
+                    ? '爆头'
+                    : v.drawn !== null
+                      ? '自摸'
+                      : '胡'}
+              </Button>
+            </div>
+          )}
           {L && v.phase === 'play' && v.window && (
             <div className="action-bar">
               {v.window.tile && (
@@ -342,7 +412,11 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
                 </span>
               )}
               {L.hu && (
-                <Button variant="felt-primary" onClick={() => act({ type: 'hu' })}>
+                <Button
+                  variant="felt-primary"
+                  className="sz-hu-btn"
+                  onClick={() => act({ type: 'hu' })}
+                >
                   {v.window.kind === 'rob' ? '抢杠胡' : '胡'}
                 </Button>
               )}
@@ -383,7 +457,11 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
           {L && v.phase === 'play' && !v.window && (
             <div className="action-bar">
               {L.hu && (
-                <Button variant="felt-primary" onClick={() => act({ type: 'hu' })}>
+                <Button
+                  variant="felt-primary"
+                  className="sz-hu-btn"
+                  onClick={() => act({ type: 'hu' })}
+                >
                   {explosiveNow ? '爆头' : '自摸'}
                 </Button>
               )}
@@ -407,7 +485,10 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
                   <Button
                     variant="felt-primary"
                     disabled={!(sel.length === 1 && L.discard.includes(sel[0]))}
-                    onClick={() => act({ type: 'discard', tile: sel[0] })}
+                    onClick={() => {
+                      if (L.hu) setConfirmDiscard(sel[0]);
+                      else act({ type: 'discard', tile: sel[0] });
+                    }}
                   >
                     出牌
                   </Button>
@@ -417,9 +498,7 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
           )}
           {!L && !spectator && v.phase === 'play' && (
             <div className="action-hint">
-              {v.window
-                ? '等待其他玩家表态…'
-                : `等待 ${ctl.players[v.turn ?? 0]?.name ?? ''} 出牌`}
+              {v.window ? '等待其他玩家表态…' : `等待 ${ctl.players[v.turn ?? 0]?.name ?? ''} 出牌`}
             </div>
           )}
           {spectator && <div className="action-hint">观战中</div>}
@@ -428,7 +507,8 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
           <div className="sz-ting">
             <span>{explosiveNow ? '爆头·听所有牌' : sel.length === 1 ? '打出后听' : '听牌'}</span>
             {previewWaits.slice(0, 12).map((k) => {
-              const left = Math.max(0, 4 - v.visible[k]);
+              const total = jokerKind === k ? (jokerKind === 33 ? 3 : 7) : 4;
+              const left = Math.max(0, total - v.visible[k]);
               return (
                 <span key={k} className={`sz-ting__tile ${left === 0 ? 'is-dead' : ''}`}>
                   <MahjongTile
@@ -444,7 +524,7 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
         )}
       </div>
 
-      <div className="sz-hand">
+      <div className={`sz-hand ${L?.hu ? 'is-hu' : ''}`}>
         {!spectator && (
           <>
             <Melds melds={mine.melds} w="calc(var(--tw) * 0.78)" />
@@ -453,6 +533,44 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
           </>
         )}
       </div>
+
+      {confirmTile && (
+        <Sheet
+          open
+          onClose={() => setConfirmDiscard(null)}
+          title="你可以胡牌！"
+          subtitle={`确定放弃这次胡牌，改打 ${sz.tileName(confirmTile)} 吗？`}
+          footer={
+            <>
+              <Button
+                variant="gold"
+                onClick={() => {
+                  setConfirmDiscard(null);
+                  act({ type: 'hu' });
+                }}
+              >
+                胡牌
+              </Button>
+              <Button onClick={() => setConfirmDiscard(null)}>取消</Button>
+              <Button
+                variant="danger"
+                onClick={() => {
+                  const id = confirmDiscard;
+                  if (id === null) return;
+                  setConfirmDiscard(null);
+                  act({ type: 'discard', tile: id });
+                }}
+              >
+                仍然打出
+              </Button>
+            </>
+          }
+        >
+          <p className="sz-confirm-text">
+            现在胡牌就能收下这一局的分数；打出去就放弃了，而且下次不一定还能摸到。建议先胡。
+          </p>
+        </Sheet>
+      )}
 
       {(v.phase === 'roundOver' || v.phase === 'matchOver') && v.result && (
         <RoundResult ctl={ctl} v={v} me={me} spectator={spectator} />
@@ -502,7 +620,7 @@ function RoundResult({
       ? `抢杠 ${ctl.players[w.from!]?.name ?? ''}`
       : w.selfDrawn
         ? '自摸'
-        : `胡 ${ctl.players[w.from!]?.name ?? ''}`;
+        : `点炮 ${ctl.players[w.from!]?.name ?? ''}`;
     return (
       <>
         <span className="mini-tag">{how}</span> {fanText(w)} · {w.score.fan} 番
@@ -512,6 +630,8 @@ function RoundResult({
   };
   const pending = r.pending;
   const clauseText = (c: string) => sz.CLAUSE_NAME[c as sz.Clause] ?? c;
+  const isJokerTile = (t: Tile) => !!t.joker;
+  const tileBadge = (t: Tile) => (t.joker ? '财' : t.sub ? '白' : undefined);
 
   return (
     <Sheet
@@ -545,7 +665,9 @@ function RoundResult({
         </div>
         <div className="result__sub">
           第 {r.session} 盘 · 第 {r.round} 局 ·{' '}
-          {r.reason === 'wall' ? `荒庄（庄家 ${ctl.players[r.dealer].name} 赔 5）` : `${r.wins.length} 家胡牌`}
+          {r.reason === 'wall'
+            ? `荒庄（庄家 ${ctl.players[r.dealer].name} 赔 5）`
+            : `${r.wins.length} 家胡牌`}
           {r.jokerKind !== null ? ` · 财神 ${sz.kindName(r.jokerKind)}` : ''}
           {` · 本局庄 ${ctl.players[r.dealer].name}（底分 ${r.dealerBase}）`}
           {r.sessionEnded
@@ -644,16 +766,38 @@ function RoundResult({
                   .filter((w) => w.seat === s)
                   .flatMap((w) => [w.tile])
                   .map((t) => (
-                    <MahjongTile key={`w-${t.id}`} tile={t} w="var(--rw)" highlight />
+                    <MahjongTile
+                      key={`w-${t.id}`}
+                      tile={t}
+                      w="var(--rw)"
+                      highlight
+                      badge={tileBadge(t)}
+                      joker={isJokerTile(t)}
+                      className={t.sub ? 'is-sub' : undefined}
+                    />
                   ))}
                 {v.players[s].melds
                   .flatMap((m) => m.tiles ?? [])
                   .map((t) => (
-                    <MahjongTile key={t.id} tile={t} w="var(--rw)" />
+                    <MahjongTile
+                      key={t.id}
+                      tile={t}
+                      w="var(--rw)"
+                      badge={tileBadge(t)}
+                      joker={isJokerTile(t)}
+                      className={t.sub ? 'is-sub' : undefined}
+                    />
                   ))}
                 {v.players[s].melds.length > 0 && <i className="sz-gap" />}
                 {v.players[s].hand?.map((t) => (
-                  <MahjongTile key={t.id} tile={t} w="var(--rw)" />
+                  <MahjongTile
+                    key={t.id}
+                    tile={t}
+                    w="var(--rw)"
+                    badge={tileBadge(t)}
+                    joker={isJokerTile(t)}
+                      className={t.sub ? 'is-sub' : undefined}
+                  />
                 ))}
               </div>
             </div>

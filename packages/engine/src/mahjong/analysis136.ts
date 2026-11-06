@@ -104,26 +104,39 @@ export function isSevenPairs(counts: readonly number[], melds: number): boolean 
 // ---------------------------------------------------------------------------
 // 财神（万能牌）
 
+/** 财神：单个种类、多个种类（如遂昌麻将的翻牌 + 白板）或没有 */
+export type JokerSpec = number | readonly number[] | null;
+
+export function jokerList(spec: JokerSpec): number[] {
+  if (spec === null) return [];
+  return typeof spec === 'number' ? [spec] : [...spec];
+}
+
+export function hasJokers(spec: JokerSpec): boolean {
+  return jokerList(spec).length > 0;
+}
+
 /** 去掉财神后的真实牌计数；同时返回财神张数 */
 export function splitJokers(
   counts: readonly number[],
-  jokerKind: number | null,
+  spec: JokerSpec,
 ): { real: number[]; jokers: number } {
   const real = [...counts];
-  if (jokerKind === null) return { real, jokers: 0 };
-  const jokers = real[jokerKind];
-  real[jokerKind] = 0;
+  let jokers = 0;
+  for (const k of jokerList(spec)) {
+    jokers += real[k];
+    real[k] = 0;
+  }
   return { real, jokers };
 }
 
-/** 财神当万能牌时的标准型和牌判定 */
-export function standardWinWithJokers(
-  counts: readonly number[],
-  jokerKind: number,
+/** 标准型（4 面子 + 1 将）和牌：real 为真实牌计数，jokers 为万能牌张数 */
+export function standardWinRaw(
+  real: readonly number[],
+  jokers: number,
   setsNeeded: number,
 ): boolean {
-  const { real, jokers } = splitJokers(counts, jokerKind);
-  const c = real;
+  const c = [...real];
   if (total(c) + jokers !== setsNeeded * 3 + 2) return false;
   const memo = new Map<string, boolean>();
   const rec = (from: number, sets: number, pair: boolean, left: number): boolean => {
@@ -183,23 +196,36 @@ export function standardWinWithJokers(
   return rec(0, 0, false, jokers);
 }
 
-/** 财神当万能牌时的七对判定 */
-export function sevenPairsWithJokers(counts: readonly number[], jokerKind: number): boolean {
-  if (total(counts) !== 14) return false;
+/** 财神当万能牌时的标准型和牌判定 */
+export function standardWinWithJokers(
+  counts: readonly number[],
+  jokerKind: JokerSpec,
+  setsNeeded: number,
+): boolean {
   const { real, jokers } = splitJokers(counts, jokerKind);
+  return standardWinRaw(real, jokers, setsNeeded);
+}
+
+/** 七对：real 为真实牌计数，jokers 为万能牌张数 */
+export function sevenPairsRaw(real: readonly number[], jokers: number): boolean {
+  if (total(real) + jokers !== 14) return false;
   let singles = 0;
   for (const n of real) if (n % 2 === 1) singles++;
   return jokers >= singles && (jokers - singles) % 2 === 0;
 }
 
-/** 碰碰胡：每一组都是刻子（财神可补） */
-export function pungWinWithJokers(
-  counts: readonly number[],
-  jokerKind: number | null,
+/** 财神当万能牌时的七对判定 */
+export function sevenPairsWithJokers(counts: readonly number[], jokerKind: JokerSpec): boolean {
+  const { real, jokers } = splitJokers(counts, jokerKind);
+  return sevenPairsRaw(real, jokers);
+}
+
+/** 碰碰胡：每一组都是刻子（财神可补）；real 为真实牌计数，jokers 为万能牌张数 */
+export function pungWinRaw(
+  real: readonly number[],
+  jokers: number,
   setsNeeded: number,
 ): boolean {
-  const { real, jokers } =
-    jokerKind === null ? { real: [...counts], jokers: 0 } : splitJokers(counts, jokerKind);
   if (total(real) + jokers !== setsNeeded * 3 + 2) return false;
   const memo = new Map<string, boolean>();
   /** 每个种类：自然能凑几个刻子，余下的 1~2 张用财神补成刻子或做将 */
@@ -230,13 +256,23 @@ export function pungWinWithJokers(
   return rec(0, 0, false, jokers);
 }
 
+/** 碰碰胡：每一组都是刻子（财神可补） */
+export function pungWinWithJokers(
+  counts: readonly number[],
+  jokerKind: JokerSpec,
+  setsNeeded: number,
+): boolean {
+  const { real, jokers } = splitJokers(counts, jokerKind);
+  return pungWinRaw(real, jokers, setsNeeded);
+}
+
 /** 是否和牌（财神当万能牌） */
 export function winWithJokers(
   counts: readonly number[],
-  jokerKind: number | null,
+  jokerKind: JokerSpec,
   setsNeeded: number,
 ): boolean {
-  if (jokerKind === null) {
+  if (!hasJokers(jokerKind)) {
     return isStandardWin(counts, setsNeeded) || (setsNeeded === 4 && isSevenPairs(counts, 0));
   }
   return (
@@ -248,7 +284,7 @@ export function winWithJokers(
 /** 听牌：再进哪些牌种可以和牌 */
 export function waitingKinds(
   counts: readonly number[],
-  jokerKind: number | null,
+  jokerKind: JokerSpec,
   melds: number,
 ): number[] {
   const out: number[] = [];
@@ -380,14 +416,21 @@ export function shanten(counts: readonly number[], melds: number): number {
 /** 把财神换成最合适的牌，得到一个「虚拟」的普通手牌（电脑与提示的快速估算用） */
 export function assignJokers(
   counts: readonly number[],
-  jokerKind: number | null,
+  jokerKind: JokerSpec,
   melds: number,
 ): number[] {
-  const c = [...counts];
-  if (jokerKind === null) return c;
-  const j = c[jokerKind];
-  if (j === 0) return c;
-  c[jokerKind] = 0;
+  const { real, jokers } = splitJokers(counts, jokerKind);
+  return assignJokersRaw(real, jokers, melds);
+}
+
+/** real 为真实牌计数，jokers 为万能牌张数 */
+export function assignJokersRaw(
+  real: readonly number[],
+  jokers: number,
+  melds: number,
+): number[] {
+  const c = [...real];
+  if (jokers === 0) return c;
   const candidates: number[] = [];
   for (let k = 0; k < KINDS; k++) {
     if (c[k] === 0) continue;
@@ -404,7 +447,7 @@ export function assignJokers(
   const uniq = [...new Set(candidates)].filter((k) => c[k] < 4);
   let best = c;
   let bestS = shanten(c, melds);
-  for (let step = 0; step < j; step++) {
+  for (let step = 0; step < jokers; step++) {
     let pick = best;
     for (const k of uniq) {
       const trial = [...best];
@@ -423,10 +466,11 @@ export function assignJokers(
 /** 考虑财神的向听数（估算：先把财神安排到最合适的位置，再算普通向听） */
 export function shantenWithJokers(
   counts: readonly number[],
-  jokerKind: number | null,
+  jokerKind: JokerSpec,
   melds: number,
 ): number {
-  if (jokerKind === null) return shanten(counts, melds);
-  if (counts[jokerKind] === 0) return shanten(counts, melds);
+  const kinds = jokerList(jokerKind);
+  if (!kinds.length) return shanten(counts, melds);
+  if (kinds.every((k) => counts[k] === 0)) return shanten(counts, melds);
   return shanten(assignJokers(counts, jokerKind, melds), melds);
 }

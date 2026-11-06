@@ -1,8 +1,9 @@
 import type { Rng } from '../../core/rng';
 import type { Seat } from '../../core/types';
-import { KINDS, countKinds, hzKindOf, kindRank } from '../../mahjong/tiles136';
-import { assignJokers, shanten } from './analysis';
+import { KINDS, hzKindOf, kindRank } from '../../mahjong/tiles136';
+import { assignJokersRaw, shanten } from './analysis';
 import type { SzAction, SzView } from './index';
+import { splitTiles, type Tile } from './tiles';
 
 /**
  * 遂昌麻将电脑玩家：
@@ -31,9 +32,10 @@ export function suichangBot(view: SzView, seat: Seat, rng: Rng): SzAction {
   const me = view.players[seat];
   const melds = me.melds.length;
   const jokerKind = view.jokerKind;
-  const virtual = assignJokers(countKinds(view.hand), jokerKind, melds);
+  const { real, jokers } = splitTiles(view.hand, jokerKind);
+  const virtual = assignJokersRaw(real, jokers, melds);
   const now = shanten(virtual, melds);
-  const isJoker = (kind: number) => jokerKind !== null && kind === jokerKind;
+  const isJokerTile = (t: Pick<Tile, 'joker'>) => !!t.joker;
 
   if (view.window) {
     const tile = view.window.tile!;
@@ -82,7 +84,7 @@ export function suichangBot(view: SzView, seat: Seat, rng: Rng): SzAction {
     const t = view.hand.find((x) => x.id === g.tile);
     if (!t) continue;
     const k = hzKindOf(t);
-    if (isJoker(k) || virtual[k] <= 0) continue;
+    if (isJokerTile(t) || virtual[k] <= 0) continue;
     if (g.type === 'an') {
       if (virtual[k] < 4) continue;
       const c = [...virtual];
@@ -101,7 +103,7 @@ export function suichangBot(view: SzView, seat: Seat, rng: Rng): SzAction {
     const t = view.hand.find((x) => x.id === id);
     if (!t) continue;
     const k = hzKindOf(t);
-    if (isJoker(k) || seen.has(k) || virtual[k] <= 0) continue;
+    if (isJokerTile(t) || seen.has(k) || virtual[k] <= 0) continue;
     seen.add(k);
     const c = [...virtual];
     c[k]--;

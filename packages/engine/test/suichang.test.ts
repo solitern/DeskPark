@@ -47,8 +47,12 @@ const CTX: SZ.WinContext = {
   explosive: false,
 };
 
-const win = (spec: string, melds: SZ.MeldShape[] = [], jokerKind: number | null = null, ctx = {}) =>
-  sz.evaluateWin(new Pool().tiles(spec), melds, jokerKind, { ...CTX, ...ctx });
+const win = (spec: string, melds: SZ.MeldShape[] = [], jokerKind: number | null = null, ctx = {}) => {
+  const tiles = new Pool()
+    .tiles(spec)
+    .map((t) => (jokerKind !== null && hz.hzKindOf(t) === jokerKind ? { ...t, joker: true } : t));
+  return sz.evaluateWin(tiles, melds, jokerKind, { ...CTX, ...ctx });
+};
 
 function player(p: Partial<SZ.SzPlayer> = {}): SZ.SzPlayer {
   return { hand: [], melds: [], river: [], hasDrawn: true, ...p };
@@ -111,13 +115,32 @@ describe('遂昌麻将 · 牌与开局', () => {
     expect(s.wall).toHaveLength(48);
     expect(s.reserve).toHaveLength(34);
     expect(s.flip).not.toBeNull();
-    expect(s.jokerKind).toBe(hz.hzKindOf(s.flip!));
-    const all = [
+    const flipKind = hz.hzKindOf(s.flip!);
+    expect(s.jokerKind).toBe(flipKind);
+    const allTiles = [
       ...s.wall,
       ...s.reserve,
       ...(s.flip ? [s.flip] : []),
       ...s.players.flatMap((p) => p.hand),
-    ].map((t) => t.id);
+    ];
+    // 翻出的种类剩 3 张才是万能财神；白板（若翻到的不是白板）变成该种类的普通牌
+    expect(allTiles.filter((t) => t.joker)).toHaveLength(3);
+    if (flipKind !== kindOf('B')) {
+      expect(allTiles.filter((t) => t.sub)).toHaveLength(4);
+      expect(allTiles.filter((t) => t.sub).every((t) => hz.hzKindOf(t) === flipKind)).toBe(true);
+    }
+    // 白板当一万：白板 23789 万 123 筒 123 条 东东 可以胡
+    const one = kindOf('1m');
+    const subWhite = { ...new Pool().one(one), sub: true };
+    expect(
+      sz.evaluateWin(
+        [...new Pool().tiles('23789m 123p 123s EE'), subWhite],
+        [],
+        one,
+        CTX,
+      ),
+    ).not.toBeNull();
+    const all = allTiles.map((t) => t.id);
     expect(all).toHaveLength(136);
     expect(new Set(all).size).toBe(136);
     expect(s.chips).toEqual([50, 50, 50, 50]);
@@ -163,13 +186,60 @@ describe('遂昌麻将 · 番与计分', () => {
   it('爆头：财神做将，听所有牌，只能自摸', () => {
     const jokerKind = kindOf('1p');
     const pool = new Pool();
-    const tiles = [...pool.tiles('123m 456m 789m 123s'), pool.one(jokerKind), pool.one(kindOf('5p'))];
+    const joker = { ...pool.one(jokerKind), joker: true };
+    const tiles = [...pool.tiles('123m 456m 789m 123s'), joker, pool.one(kindOf('5p'))];
     const v = sz.evaluateWin(tiles, [], jokerKind, { ...CTX, selfDrawn: true, explosive: true })!;
     expect(v.fan).toBe(2); // 爆头 1 + 自摸 1
     // 13 张的爆头听牌形
-    const hand13 = [...pool.tiles('123m 456m 789m 123s'), pool.one(jokerKind)];
-    expect(sz.explosiveWait(sz.countKinds(hand13), jokerKind, 0)).toBe(true);
-    expect(sz.waits(sz.countKinds(hand13), jokerKind, 0)).toHaveLength(34);
+    const hand13 = [...pool.tiles('123m 456m 789m 123s'), joker];
+    expect(sz.isExplosiveHand(hand13, jokerKind, 0)).toBe(true);
+    expect(sz.handWaits(hand13, jokerKind, 0)).toHaveLength(34);
+  });
+
+  it('白板当一万：白板 23789万 123筒 123条 东东 可以胡', () => {
+    const one = kindOf('1m');
+    const subWhite = { ...new Pool().one(one), sub: true };
+    const hand = [...new Pool().tiles('23789m 123p 123s EE'), subWhite];
+    const v = sz.evaluateWin(hand, [], one, CTX);
+    expect(v).not.toBeNull();
+    expect(v!.fan).toBe(0);
+  });
+
+  it('七风：七张字牌齐全 +1 番，财神不能补缺', () => {
+    const hand = 'E S W N Z F B 147m 258p 9s';
+    const v = win(hand)!;
+    expect(v.buda).toBe('ordinary');
+    expect(v.fan).toBe(1);
+    expect(v.patterns.map((p) => p.id)).toContain('qifeng');
+    expect(win(hand, [], null, { selfDrawn: true })!.fan).toBe(2);
+    // 缺东、用别的财神补：能胡，但不算七风
+    const jokerKind = kindOf('1p');
+    const noEast = win('S W N Z F B 147m 258p 9s 1p', [], jokerKind)!;
+    expect(noEast.buda).toBe('ordinary');
+    expect(noEast.fan).toBe(0);
+    // 财神正好是东：可以当东用，算七风
+    const eastJoker = win('S W N Z F B 147m 258p 9s E', [], kindOf('E'))!;
+    expect(eastJoker.fan).toBe(1);
+  });
+
+  it('全落地：4 组副露 + 将 +1 番（吃碰杠都算）', () => {
+    const melds: SZ.MeldShape[] = [
+      { type: 'chi', kind: kindOf('1m') },
+      { type: 'chi', kind: kindOf('4m') },
+      { type: 'chi', kind: kindOf('7m') },
+      { type: 'chi', kind: kindOf('1p') },
+    ];
+    const v = win('55s', melds)!;
+    expect(v.patterns.map((p) => p.id)).toContain('quanluodi');
+    expect(v.fan).toBe(1);
+    // 四组碰 + 将：碰碰胡 1 + 全落地 1
+    const pungs: SZ.MeldShape[] = ['1m', '3m', '5m', '7p'].map((s) => ({
+      type: 'pung' as const,
+      kind: kindOf(s),
+    }));
+    const pv = win('99s', pungs)!;
+    expect(pv.fan).toBe(2);
+    expect(pv.patterns.map((p) => p.id)).toEqual(expect.arrayContaining(['pengpeng', 'quanluodi']));
   });
 
   it('天胡 / 地胡 +2 番，不再叠自摸', () => {
@@ -323,7 +393,7 @@ describe('遂昌麻将 · 行牌', () => {
     const pool = new Pool();
     const jokerKind = kindOf('5m');
     const six = pool.one(kindOf('6m'));
-    const joker = pool.one(jokerKind);
+    const joker = { ...pool.one(jokerKind), joker: true };
     const players = [
       player({ hand: [...pool.tiles(JUNK[0].replace('7p', '9p')), six] }),
       player({ hand: [...pool.tiles('4m 1p 2p 1s 2s 3s 4s 5s 6s 7s 8s 9s'), joker] }),
@@ -340,7 +410,7 @@ describe('遂昌麻将 · 行牌', () => {
   it('飞财：打出的财神作废；一圈内不能吃碰点炮，飞财者下一次自摸 +1 番', () => {
     const pool = new Pool();
     const jokerKind = kindOf('1p');
-    const joker = pool.one(jokerKind);
+    const joker = { ...pool.one(jokerKind), joker: true };
     const players = [
       player({ hand: [...pool.tiles('2345678m 234s 567p'), joker] }),
       player({ hand: pool.tiles(JUNK[1]) }),
@@ -376,7 +446,7 @@ describe('遂昌麻将 · 行牌', () => {
   it('爆头不听点炮：4 面 + 财神 的牌型不会被别人点炮胡', () => {
     const pool = new Pool();
     const jokerKind = kindOf('1p');
-    const joker = pool.one(jokerKind);
+    const joker = { ...pool.one(jokerKind), joker: true };
     const five = pool.one(kindOf('5p'));
     const players = [
       player({ hand: [...pool.tiles(JUNK[0].replace('7p', '9p')), five] }),

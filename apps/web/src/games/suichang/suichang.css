@@ -19,8 +19,13 @@
   left: 16px;
 }
 .sz-jokerchip {
-  gap: 4px;
+  gap: 3px;
   padding-left: 8px;
+}
+.sz-jokerchip small {
+  font-size: 10px;
+  opacity: 0.75;
+  white-space: nowrap;
 }
 .sz-flychip {
   background: linear-gradient(180deg, rgba(240, 213, 155, 0.95), rgba(201, 162, 91, 0.95));
@@ -203,7 +208,7 @@
   color: var(--felt-ink-2);
 }
 
-/* ---------- 鐗屾涓ぎ ---------- */
+/* ---------- 牌桌中央 ---------- */
 .sz-center {
   grid-area: center;
   position: relative;
@@ -341,7 +346,7 @@
   box-shadow: 0 0 12px rgba(231, 200, 134, 0.6);
 }
 
-/* 鍚?/ 纰?/ 鏉?/ 鑳?澶у瓧 */
+/* 胡 / 碰 / 杠 / 吃 大字 */
 .sz-shout {
   position: absolute;
   z-index: 40;
@@ -400,7 +405,60 @@
 }
 .sz-actions {
   display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
+  gap: 2px;
+}
+/* 能胡时：大字提示 + 金色大按钮，防止看漏 */
+.sz-hu-callout {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 6px 4px 16px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffe8a8, #d8a94a);
+  color: #3a2606;
+  box-shadow:
+    0 0 0 2px rgba(255, 240, 200, 0.55),
+    0 0 22px rgba(244, 214, 139, 0.85),
+    0 6px 18px rgba(0, 0, 0, 0.35);
+  animation: sz-hu-pulse 1.15s ease-in-out infinite;
+}
+.sz-hu-callout span {
+  font-family: var(--font-display);
+  font-size: clamp(14px, 2.2vh, 19px);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+.sz-hu-callout .sz-hu-btn {
+  --btn-h: 40px;
+  min-width: 88px;
+  font-size: clamp(16px, 2.4vh, 21px);
+}
+.sz-hu-btn {
+  box-shadow:
+    0 0 0 2px rgba(255, 240, 200, 0.7),
+    0 0 16px rgba(244, 214, 139, 0.8);
+  animation: sz-hu-pulse 1.15s ease-in-out infinite;
+}
+@keyframes sz-hu-pulse {
+  0%,
+  100% {
+    filter: brightness(1);
+    transform: scale(1);
+  }
+  50% {
+    filter: brightness(1.12);
+    transform: scale(1.035);
+  }
+}
+.sz-confirm-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--ink-2);
 }
 .sz-actions .action-hint .mjtile {
   margin-left: 6px;
@@ -463,8 +521,40 @@
 }
 .sz-handtile.is-joker .mjtile {
   box-shadow:
-    0 0 0 2px var(--felt-accent),
-    0 0 12px rgba(231, 200, 134, 0.55);
+    0 0 0 3px #ffd97a,
+    0 0 22px rgba(255, 217, 122, 0.95),
+    0 calc(var(--w, var(--tw)) * 0.07) 0 var(--tile-edge),
+    0 calc(var(--w, var(--tw)) * 0.12) 0 var(--tile-back-1),
+    0 calc(var(--w, var(--tw)) * 0.12 + 2px) 8px rgba(0, 0, 0, 0.35);
+  translate: 0 -7px;
+  animation: sz-joker-breathe 2.4s ease-in-out infinite;
+}
+.sz-handtile.is-joker::after {
+  content: '财神';
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--tw) * -0.05);
+  translate: -50% 0;
+  z-index: 5;
+  padding: 1px 5px;
+  border-radius: 99px;
+  background: linear-gradient(180deg, #ffe8a8, #d8a94a);
+  color: #3a2606;
+  font-size: max(9px, calc(var(--tw) * 0.2));
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+@keyframes sz-joker-breathe {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.1);
+  }
 }
 
 /* ---------- 缁撶畻 ---------- */
