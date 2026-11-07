@@ -36,6 +36,24 @@ export function splitTiles(
   return { real, jokers };
 }
 
+/**
+ * 不搭专用计数：白板替身在「不搭」里算白板字牌，不算它替代的那张牌；
+ * 真财神仍然是万能牌。
+ */
+export function splitTilesForBuDa(
+  tiles: readonly Tile[],
+  jokerKind: number | null,
+): { real: number[]; jokers: number } {
+  const real = new Array<number>(34).fill(0);
+  let jokers = 0;
+  for (const t of tiles) {
+    if (jokerKind !== null && t.joker) jokers++;
+    else if (t.sub) real[JIAN_BAI]++;
+    else real[hzKindOf(t)]++;
+  }
+  return { real, jokers };
+}
+
 /** 手牌排序：财神放最左；白板替身放在它代替的那张牌的位置（按有效牌种排）。 */
 export function sortTiles(tiles: readonly Tile[], jokerKind: number | null = null): Tile[] {
   const group = (t: Tile) => (jokerKind !== null && t.joker ? 0 : 1);

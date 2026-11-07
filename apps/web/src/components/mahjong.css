@@ -101,8 +101,8 @@
 .mjtile__badge {
   position: absolute;
   z-index: 4;
-  right: calc(var(--w) * -0.16);
-  top: calc(var(--w) * -0.16);
+  right: calc(var(--w) * 0.04);
+  top: calc(var(--w) * 0.04);
   display: grid;
   place-items: center;
   min-width: calc(var(--w) * 0.42);

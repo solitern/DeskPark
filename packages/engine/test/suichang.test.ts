@@ -183,6 +183,23 @@ describe('遂昌麻将 · 番与计分', () => {
     expect(withJoker.buda).toBe('luxury');
   });
 
+  it('不搭里白板算字牌：白板 + 5 字 + 147/258/369 = 豪华不搭', () => {
+    const sub = { ...new Pool().one(kindOf('1m')), sub: true };
+    const hand = [...new Pool().tiles('258m 147s 369p E S W N'), sub];
+    const v = sz.evaluateWin(hand, [], kindOf('1m'), CTX)!;
+    expect(v.buda).toBe('luxury');
+    expect(v.fan).toBe(2);
+  });
+
+  it('七风里白板也算白板字牌', () => {
+    const sub = { ...new Pool().one(kindOf('1m')), sub: true };
+    const hand = [...new Pool().tiles('147m 258p 9s E S W N Z F'), sub];
+    const v = sz.evaluateWin(hand, [], kindOf('1m'), CTX)!;
+    expect(v.buda).toBe('ordinary');
+    expect(v.patterns.map((p) => p.id)).toContain('qifeng');
+    expect(v.fan).toBe(1);
+  });
+
   it('敲头：财神做将，听所有牌，只能自摸', () => {
     const jokerKind = kindOf('1p');
     const pool = new Pool();

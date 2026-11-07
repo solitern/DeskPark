@@ -2,7 +2,7 @@ import { KINDS, NUMBER_SUITS, kindSuit } from '../../mahjong/tiles136';
 import { pungWinRaw, sevenPairsRaw, standardWinRaw, total } from '../../mahjong/analysis136';
 import { BUDA_FAN, BUDA_NAME, isSevenWinds, nonMeldWin } from './analysis';
 import type { BuDaClass } from './analysis';
-import { splitTiles } from './tiles';
+import { splitTiles, splitTilesForBuDa } from './tiles';
 import type { Tile } from './tiles';
 
 /**
@@ -116,13 +116,15 @@ export function evaluateWin(
   ctx: WinContext,
 ): WinScore | null {
   const { real, jokers } = splitTiles(concealed, jokerKind);
+  // 不搭里白板算白板字牌，不算它代替的那张牌；真财神仍是万能牌
+  const buDa = splitTilesForBuDa(concealed, jokerKind);
   const meldCount = melds.length;
   const setsNeeded = 4 - meldCount;
   const items: FanItem[] = [];
   let buda: BuDaClass | null = null;
 
   if (meldCount === 0) {
-    buda = nonMeldWin(real, jokers);
+    buda = nonMeldWin(buDa.real, buDa.jokers);
   }
 
   if (!buda) {
@@ -166,7 +168,7 @@ export function evaluateWin(
       fan: BUDA_FAN[buda],
     });
     // 七风：不搭手里东南西北中发白七张字牌齐全
-    if (buda === 'ordinary' && isSevenWinds(real, jokers, jokerKind))
+    if (buda === 'ordinary' && isSevenWinds(buDa.real, buDa.jokers, jokerKind))
       items.push({ id: 'qifeng', fan: 1 });
   }
 

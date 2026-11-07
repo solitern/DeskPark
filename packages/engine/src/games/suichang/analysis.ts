@@ -287,6 +287,24 @@ export function isWin14(real: readonly number[], jokers: number, melds: number):
   return melds === 0 && !!nonMeldWin(real, jokers);
 }
 
+/** 不搭专用听牌：白板替身按白板字牌算 */
+export function buDaWaits(
+  real: readonly number[],
+  jokers: number,
+  jokerKind: number | null,
+): number[] {
+  const out: number[] = [];
+  for (let k = 0; k < KINDS; k++) {
+    if (real[k] >= 4) continue;
+    const c = [...real];
+    c[k]++;
+    if (nonMeldWin(c, jokers)) out.push(k);
+  }
+  // 摸到财神（万能牌）也可能补成不搭
+  if (jokerKind !== null && nonMeldWin(real, jokers + 1)) out.push(jokerKind);
+  return out;
+}
+
 /**
  * 听牌：再进哪些牌可以和牌（含不搭与敲头）。
  * 一万既是财神（万能）又有白板替身（普通一万），所以两边的进张都要算。
