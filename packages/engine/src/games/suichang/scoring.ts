@@ -1,6 +1,12 @@
 import { KINDS, NUMBER_SUITS, kindSuit } from '../../mahjong/tiles136';
 import { pungWinRaw, sevenPairsRaw, standardWinRaw, total } from '../../mahjong/analysis136';
-import { BUDA_FAN, BUDA_NAME, isSevenWinds, nonMeldWin } from './analysis';
+import {
+  BUDA_FAN,
+  BUDA_NAME,
+  isSevenWinds,
+  nonMeldWin,
+  sevenPairsQiaotouWait,
+} from './analysis';
 import type { BuDaClass } from './analysis';
 import { splitTiles, splitTilesForBuDa } from './tiles';
 import type { Tile } from './tiles';
@@ -130,6 +136,18 @@ export function evaluateWin(
   if (!buda) {
     const qidui = meldCount === 0 && sevenPairsRaw(real, jokers);
     if (!standardWinRaw(real, jokers, setsNeeded) && !qidui) return null;
+    // 七对敲头：这张和牌拿掉后，剩下 13 张加任意牌都能七对（支持多张财神）
+    let qiduiQiaotou = false;
+    if (qidui) {
+      for (let k = 0; k < 34 && !qiduiQiaotou; k++) {
+        if (real[k] === 0) continue;
+        const c = [...real];
+        c[k]--;
+        if (sevenPairsQiaotouWait(c, jokers)) qiduiQiaotou = true;
+      }
+      if (!qiduiQiaotou && jokers > 0 && sevenPairsQiaotouWait(real, jokers - 1))
+        qiduiQiaotou = true;
+    }
     const haohua = qidui && real.some((n) => n >= 4);
     const pengpeng =
       melds.every((m) => m.type !== 'chi') && pungWinRaw(real, jokers, setsNeeded);
@@ -156,8 +174,8 @@ export function evaluateWin(
       if (qing) qiduiItems.push(['qingyise', 2]);
       else if (hun) qiduiItems.push(['hunyise', 1]);
       if (zi) qiduiItems.push(['ziyise', 3]);
-      // 七对敲头：6 个对子 + 1 张财神，胡任意牌；与七对/豪华同属七对番型
-      if (jokers === 1) qiduiItems.push(['qiaotou', 1]);
+      // 七对敲头：去掉和牌后听任意牌；与七对/豪华同属七对番型
+      if (qiduiQiaotou) qiduiItems.push(['qiaotou', 1]);
     }
     const sum = (arr: [FanId, number][]) => arr.reduce((a, b) => a + b[1], 0);
     const chosen = qiduiItems.length && sum(qiduiItems) > sum(standard) ? qiduiItems : standard;

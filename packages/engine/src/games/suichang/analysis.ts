@@ -274,9 +274,16 @@ export function explosiveWait(real: readonly number[], jokers: number, melds: nu
   return allSets(real, jokers - 1, 4 - melds);
 }
 
-/** 13 张手牌是不是七对敲头：6 个对子 + 1 张财神，听任意牌 */
+/** 13 张手牌是不是七对敲头：加任意一张都能七对（支持多张财神） */
 export function sevenPairsQiaotouWait(real: readonly number[], jokers: number): boolean {
-  return jokers === 1 && total(real) === 12 && real.every((n) => n % 2 === 0);
+  if (jokers === 0 || total(real) + jokers !== 13) return false;
+  for (let k = 0; k < KINDS; k++) {
+    if (real[k] >= 4) continue;
+    const c = [...real];
+    c[k]++;
+    if (!sevenPairsRaw(c, jokers)) return false;
+  }
+  return true;
 }
 
 /** 14 张（或加副露）是否和牌：标准型 / 七对 / 不搭 */

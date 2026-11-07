@@ -234,6 +234,24 @@ describe('遂昌麻将 · 番与计分', () => {
     expect(hh.fan).toBe(4);
   });
 
+  it('多财神七对敲头：两个财神也听任意牌', () => {
+    const jokerKind = kindOf('1s');
+    const v = win('11m 33m 55m 77m 99m 2p 5p 1s 1s', [], jokerKind, {
+      selfDrawn: true,
+    })!;
+    expect(v.patterns.map((p) => p.id)).toEqual(
+      expect.arrayContaining(['qidui', 'qiaotou', 'zimo']),
+    );
+    expect(v.fan).toBe(3);
+    const pool = new Pool();
+    const jokers = [
+      { ...pool.one(jokerKind), joker: true },
+      { ...pool.one(jokerKind), joker: true },
+    ];
+    const hand13 = [...pool.tiles('11m 33m 55m 77m 99m 2p'), ...jokers];
+    expect(sz.isSevenPairsQiaotouHand(hand13, jokerKind)).toBe(true);
+  });
+
   it('白板当一万：白板 23789万 123筒 123条 东东 可以胡', () => {
     const one = kindOf('1m');
     const subWhite = { ...new Pool().one(one), sub: true };
@@ -554,6 +572,18 @@ describe('遂昌麻将 · 调试', () => {
     }
     expect(s.players[1].hand.some((t) => t.id === debugTile.id)).toBe(true);
     expect(s.debugDraw).toBeNull();
+  });
+
+  it('debug 优先发真财神，不发白板替身', () => {
+    const pool = new Pool();
+    const jokerKind = kindOf('1p');
+    const sub = { ...pool.one(jokerKind), sub: true };
+    const real = { ...pool.one(jokerKind), joker: true };
+    const players = [0, 1, 2, 3].map(() => player());
+    const s = baseState(players, { wall: [sub, real] });
+    const next = act(s, 0, { type: 'debug', kind: jokerKind });
+    expect(next.debugDraw?.tile.joker).toBe(true);
+    expect(next.debugDraw?.tile.id).toBe(real.id);
   });
 
   it('debug 指定的牌不在牌墙里时校验失败', () => {
