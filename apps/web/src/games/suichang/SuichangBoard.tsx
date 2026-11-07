@@ -52,7 +52,16 @@ function Melds({ melds, w }: { melds: SZ.SzMeldView[]; w: string }) {
                   key={t.id}
                   tile={t.sub ? { id: t.id, suit: 'jian' as const, rank: 3 } : t}
                   w={w}
-                  badge={t.joker ? '财' : t.sub ? sz.kindName(sz.hzKindOf(t)) : undefined}
+                  badge={t.joker ? '财' : undefined}
+                  cornerTile={
+                    t.sub
+                      ? {
+                          id: -1,
+                          suit: sz.kindSuit(sz.hzKindOf(t)),
+                          rank: sz.kindRank(sz.hzKindOf(t)),
+                        }
+                      : undefined
+                  }
                   joker={!!t.joker}
                   className={t.sub ? 'is-sub' : undefined}
                 />
@@ -79,14 +88,21 @@ function River({
       {river.map((r) => {
         const joker = !!r.tile.joker;
         const shown = r.tile.sub ? { id: r.tile.id, suit: 'jian' as const, rank: 3 } : r.tile;
-        const badge = joker ? '财' : r.tile.sub ? sz.kindName(sz.hzKindOf(r.tile)) : undefined;
+        const corner = r.tile.sub
+          ? {
+              id: -1,
+              suit: sz.kindSuit(sz.hzKindOf(r.tile)),
+              rank: sz.kindRank(sz.hzKindOf(r.tile)),
+            }
+          : undefined;
         return (
           <MahjongTile
             key={r.tile.id}
             tile={shown}
             w="var(--rw)"
             highlight={r.tile.id === lastId}
-            badge={badge}
+            badge={joker ? '财' : undefined}
+            cornerTile={corner}
             joker={joker}
             className={`${r.claimedBy?.length ? 'is-claimed' : ''} ${r.tile.sub ? 'is-sub' : ''}`}
           />
@@ -107,6 +123,9 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
   const jokerKind = v.jokerKind;
   const [sel, setSel] = useState<number[]>([]);
   const [confirmDiscard, setConfirmDiscard] = useState<number | null>(null);
+  const [debugOpen, setDebugOpen] = useState(false);
+  const debugSeq = useRef<number[]>([]);
+  const debugTimer = useRef<number | null>(null);
   const [rootRef, width] = useWidth<HTMLDivElement>();
   const actRef = useRef<HTMLDivElement>(null);
 
@@ -192,11 +211,44 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
     else setSel([]);
   };
 
+  /** 调试入口：按东→南→西→北点击牌桌中心，打开「设置下一张牌」（仅本地练习） */
+  const onWind = (s: number) => {
+    if (ctl.mode !== 'local') return;
+    const seq = [...debugSeq.current, s];
+    if (seq.every((v, i) => v === i)) {
+      debugSeq.current = seq;
+      if (seq.length === 4) {
+        debugSeq.current = [];
+        setDebugOpen(true);
+        toast('调试：设置下一张牌');
+      }
+    } else {
+      debugSeq.current = s === 0 ? [0] : [];
+    }
+    if (debugTimer.current !== null) window.clearTimeout(debugTimer.current);
+    debugTimer.current = window.setTimeout(() => {
+      debugSeq.current = [];
+    }, 2500);
+  };
+
+  const setNextTile = (kind: number) => {
+    const err = ctl.act({ type: 'debug', kind });
+    if (err) {
+      toast(err, 'error');
+      return;
+    }
+    toast(`下一张：${sz.kindName(kind)}`);
+    setDebugOpen(false);
+  };
+
   const isJoker = (t: Tile) => !!t.joker;
-  const subName = (t: Tile) =>
-    t.sub && jokerKind !== null ? sz.kindName(jokerKind) : t.sub ? '白' : undefined;
   /** 白板保留牌面，只在对局语义上当翻出的那张牌；显示时换回白板脸 */
   const shownTile = (t: Tile) => (t.sub ? { id: t.id, suit: 'jian' as const, rank: 3 } : t);
+  /** 白板右上角显示它代替的那张牌 */
+  const subCorner = (t: Tile) =>
+    t.sub
+      ? { id: -1, suit: sz.kindSuit(sz.hzKindOf(t)), rank: sz.kindRank(sz.hzKindOf(t)) }
+      : undefined;
 
   /** 可以胡的时候，双击手牌不再直接打出，先确认，避免误打 */
   const onTile = (t: Tile) => {
@@ -248,7 +300,8 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
         <MahjongTile
           tile={shownTile(t)}
           selected={sel.includes(t.id)}
-          badge={joker ? '财' : subName(t)}
+          badge={joker ? '财' : undefined}
+          cornerTile={subCorner(t)}
           joker={joker}
           className={t.sub ? 'is-sub' : undefined}
         />
@@ -281,7 +334,16 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
                     key={t.id}
                     tile={t.sub ? { id: t.id, suit: 'jian' as const, rank: 3 } : t}
                     w="var(--rw)"
-                    badge={t.joker ? '财' : t.sub ? sz.kindName(sz.hzKindOf(t)) : undefined}
+                    badge={t.joker ? '财' : undefined}
+                    cornerTile={
+                      t.sub
+                        ? {
+                            id: -1,
+                            suit: sz.kindSuit(sz.hzKindOf(t)),
+                            rank: sz.kindRank(sz.hzKindOf(t)),
+                          }
+                        : undefined
+                    }
                     joker={!!t.joker}
                     className={t.sub ? 'is-sub' : undefined}
                   />
@@ -339,7 +401,11 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
               <MahjongTile
                 tile={{ id: -100, suit: sz.kindSuit(33), rank: sz.kindRank(33) }}
                 w="18px"
-                badge={sz.kindName(jokerKind)}
+                cornerTile={{
+                  id: -101,
+                  suit: sz.kindSuit(jokerKind),
+                  rank: sz.kindRank(jokerKind),
+                }}
                 className="is-sub"
               />
             )}
@@ -369,6 +435,8 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
                 <span
                   key={p}
                   className={`sz-wind is-${p} ${turnPos === p && v.phase === 'play' ? 'is-on' : ''} ${s === v.dealer ? 'is-dealer' : ''}`}
+                  title={ctl.mode === 'local' ? '按 东 → 南 → 西 → 北 点击可打开调试' : undefined}
+                  onClick={ctl.mode === 'local' ? () => onWind(s) : undefined}
                 >
                   {WIND[s]}
                 </span>
@@ -606,6 +674,34 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
         </Sheet>
       )}
 
+      <Sheet
+        open={debugOpen}
+        onClose={() => setDebugOpen(false)}
+        title="调试：设置下一张牌"
+        subtitle="点击一张牌，把它移到牌墙最前面，下一次摸牌就是它"
+        wide
+      >
+        <div className="sz-debug-grid">
+          {Array.from({ length: 34 }, (_, k) => (
+            <button
+              key={k}
+              type="button"
+              className="sz-debug-tile"
+              onClick={() => setNextTile(k)}
+            >
+              <MahjongTile
+                tile={{ id: -k - 1, suit: sz.kindSuit(k), rank: sz.kindRank(k) }}
+                w="34px"
+              />
+              <small>{sz.kindName(k)}</small>
+            </button>
+          ))}
+        </div>
+        <p className="sz-debug-note">
+          只会改牌墙顺序，不会凭空造牌；牌墙里已经没有这张时会提示。仅用于本地测试。
+        </p>
+      </Sheet>
+
       {(v.phase === 'roundOver' || v.phase === 'matchOver') && v.result && (
         <RoundResult ctl={ctl} v={v} me={me} spectator={spectator} />
       )}
@@ -668,8 +764,11 @@ function RoundResult({
   const clauseText = (c: string) => sz.CLAUSE_NAME[c as sz.Clause] ?? c;
   const isJokerTile = (t: Tile) => !!t.joker;
   const shownTile = (t: Tile) => (t.sub ? { id: t.id, suit: 'jian' as const, rank: 3 } : t);
-  const tileBadge = (t: Tile) =>
-    t.joker ? '财' : t.sub ? sz.kindName(sz.hzKindOf(t)) : undefined;
+  const subCorner = (t: Tile) =>
+    t.sub
+      ? { id: -1, suit: sz.kindSuit(sz.hzKindOf(t)), rank: sz.kindRank(sz.hzKindOf(t)) }
+      : undefined;
+  const tileBadge = (t: Tile) => (t.joker ? '财' : undefined);
 
   return (
     <Sheet
@@ -810,6 +909,7 @@ function RoundResult({
                       w="var(--rw)"
                       highlight
                       badge={tileBadge(t)}
+                      cornerTile={subCorner(t)}
                       joker={isJokerTile(t)}
                       className={t.sub ? 'is-sub' : undefined}
                     />
@@ -822,6 +922,7 @@ function RoundResult({
                       tile={shownTile(t)}
                       w="var(--rw)"
                       badge={tileBadge(t)}
+                      cornerTile={subCorner(t)}
                       joker={isJokerTile(t)}
                       className={t.sub ? 'is-sub' : undefined}
                     />

@@ -65,7 +65,8 @@ export type SzAction =
   | { type: 'peng' }
   | { type: 'chi'; tiles: number[] }
   | { type: 'pass' }
-  | { type: 'ready' };
+  | { type: 'ready' }
+  | { type: 'debug'; kind: number };
 
 export type KongType = 'an' | 'zhi' | 'ba';
 
@@ -824,6 +825,8 @@ function cleanAction(a: SzAction): SzAction {
       return typeof a.tile === 'number' ? { type: 'gang', tile: Number(a.tile) } : { type: 'gang' };
     case 'chi':
       return { type: 'chi', tiles: Array.isArray(a.tiles) ? a.tiles.map(Number) : [] };
+    case 'debug':
+      return { type: 'debug', kind: Number(a.kind) };
     default:
       return { type: a.type };
   }
@@ -965,6 +968,14 @@ export const suichang: GameDefinition<SzState, SzAction, SzView, SzOptions> = {
   activeSeats,
 
   validate(state, seat, action) {
+    // 调试：把牌墙里的一张指定牌种移到最前面，作为下一次摸牌
+    if (action.type === 'debug') {
+      if (state.phase !== 'play') return '现在不能调试';
+      if (!Number.isInteger(action.kind) || action.kind < 0 || action.kind >= 34)
+        return '牌种不对';
+      if (!state.wall.some((t) => hzKindOf(t) === action.kind)) return '牌墙里没有这张牌';
+      return null;
+    }
     const L = legalActions(state, seat);
     if (!L) return '现在不是你的操作时机';
     const p = state.players[seat];
@@ -1003,6 +1014,14 @@ export const suichang: GameDefinition<SzState, SzAction, SzView, SzOptions> = {
     const state = clone(prev);
     const p = state.players[seat];
     switch (action.type) {
+      case 'debug': {
+        const idx = state.wall.findIndex((t) => hzKindOf(t) === action.kind);
+        if (idx >= 0) {
+          const [tile] = state.wall.splice(idx, 1);
+          state.wall.unshift(tile);
+        }
+        return state;
+      }
       case 'ready': {
         state.ready[seat] = true;
         if (state.ready.every(Boolean)) {

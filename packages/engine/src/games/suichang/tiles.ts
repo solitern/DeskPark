@@ -36,9 +36,9 @@ export function splitTiles(
   return { real, jokers };
 }
 
-/** 手牌排序：财神放最左、白板替身放最右，中间按万条筒、字牌排。 */
+/** 手牌排序：财神放最左；白板替身放在它代替的那张牌的位置（按有效牌种排）。 */
 export function sortTiles(tiles: readonly Tile[], jokerKind: number | null = null): Tile[] {
-  const group = (t: Tile) => (jokerKind !== null && t.joker ? 0 : t.sub ? 2 : 1);
+  const group = (t: Tile) => (jokerKind !== null && t.joker ? 0 : 1);
   return [...tiles].sort(
     (a, b) =>
       group(a) - group(b) ||

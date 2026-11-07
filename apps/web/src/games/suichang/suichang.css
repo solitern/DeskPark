@@ -460,6 +460,55 @@
   line-height: 1.7;
   color: var(--ink-2);
 }
+/* 调试：点东南西北打开，选择下一张摸牌 */
+.sz-wind {
+  cursor: pointer;
+}
+.sz-debug-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+.sz-debug-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 3px;
+  border: 1px solid rgba(120, 100, 60, 0.18);
+  border-radius: 10px;
+  background: rgba(255, 253, 247, 0.7);
+  cursor: pointer;
+  transition:
+    transform 0.12s var(--ease),
+    box-shadow 0.12s;
+}
+.sz-debug-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+.sz-debug-tile small {
+  font-size: 11px;
+  color: var(--ink-2);
+}
+.sz-debug-note {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+@media (max-width: 560px) {
+  .sz-debug-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .sz-debug-tile {
+    padding: 4px 2px;
+  }
+  .sz-debug-tile small {
+    font-size: 10px;
+  }
+}
 .sz-actions .action-hint .mjtile {
   margin-left: 6px;
 }

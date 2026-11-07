@@ -501,6 +501,24 @@ describe('遂昌麻将 · 行牌', () => {
   });
 });
 
+describe('遂昌麻将 · 调试', () => {
+  it('debug 把指定牌种移到牌墙最前面', () => {
+    const pool = new Pool();
+    const players = [0, 1, 2, 3].map(() => player());
+    const s = baseState(players, { wall: pool.tiles('1m 2m 3m 4m') });
+    const next = act(s, 0, { type: 'debug', kind: kindOf('3m') });
+    expect(hz.hzKindOf(next.wall[0])).toBe(kindOf('3m'));
+    expect(next.wall.map((t) => t.id).sort()).toEqual(s.wall.map((t) => t.id).sort());
+  });
+
+  it('debug 指定的牌不在牌墙里时校验失败', () => {
+    const pool = new Pool();
+    const players = [0, 1, 2, 3].map(() => player());
+    const s = baseState(players, { wall: pool.tiles('1m') });
+    expect(suichang.validate(s, 0, { type: 'debug', kind: kindOf('9p') })).not.toBeNull();
+  });
+});
+
 describe('遂昌麻将 · 整盘模拟', () => {
   function allTileIds(s: State): number[] {
     const ids = [

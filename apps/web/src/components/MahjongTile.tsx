@@ -330,6 +330,8 @@ export interface MahjongTileProps extends HTMLAttributes<HTMLDivElement> {
   que?: boolean;
   /** 角标文字（例如财神「财」） */
   badge?: string;
+  /** 右上角显示的小牌（白板替身用来显示它代替的那张牌） */
+  cornerTile?: TileLike | null;
   /** 财神光圈 */
   joker?: boolean;
 }
@@ -345,6 +347,7 @@ export const MahjongTile = memo(function MahjongTile({
   highlight,
   que,
   badge,
+  cornerTile,
   joker,
   className = '',
   style,
@@ -368,6 +371,11 @@ export const MahjongTile = memo(function MahjongTile({
       {tile && !faceDown && <TileFace tile={tile} />}
       {que && <span className="mjtile__que">缺</span>}
       {badge && !faceDown && <span className="mjtile__badge">{badge}</span>}
+      {cornerTile && !faceDown && (
+        <span className="mjtile__corner">
+          <TileFace tile={cornerTile} />
+        </span>
+      )}
     </div>
   );
 });
