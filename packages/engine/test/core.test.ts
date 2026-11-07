@@ -25,6 +25,7 @@ describe('基础设施', () => {
       'onecard',
       'hexisle',
       'gemguild',
+      'xiyouji',
       'highcard',
     ]);
     const ddz = listGames()[0];

@@ -14,6 +14,7 @@ import {
   spellstones,
   texas,
   xiangqi,
+  xiyouji,
 } from '../src';
 
 /** 状态里不允许出现 NaN / Infinity（会让筹码、分数等永久损坏） */
@@ -155,6 +156,10 @@ describe('畸形动作模糊测试（模拟恶意联机客户端）', () => {
   it('掼蛋', () => {
     for (let seed = 1; seed <= 6; seed++)
       fuzz(guandan, 4, guandan.defaultOptions, ['play', 'pass', 'return', 'ready'], seed);
+  });
+  it('西游记', () => {
+    for (let seed = 1; seed <= 10; seed++)
+      fuzz(xiyouji, 4, xiyouji.defaultOptions, ['play', 'pass', 'ready'], seed);
   });
   it('德州扑克', () => {
     for (let seed = 1; seed <= 15; seed++)

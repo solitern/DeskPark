@@ -1,0 +1,257 @@
+.xyj {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(84px, 1fr) minmax(0, 4.4fr) minmax(84px, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    'info info info'
+    'left center right'
+    'me me me'
+    'hand hand hand';
+  padding: 2px max(14px, 2vw) 10px;
+}
+.xyj__info {
+  grid-area: info;
+  padding-bottom: 4px;
+}
+.xyj__seat {
+  align-self: center;
+  justify-self: center;
+  margin-top: -10%;
+}
+.xyj__seat.is-left {
+  grid-area: left;
+}
+.xyj__seat.is-right {
+  grid-area: right;
+}
+.xyj .seat.is-ally .avatar {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+    0 0 0 2px rgba(111, 194, 168, 0.55),
+    0 2px 6px rgba(0, 0, 0, 0.25);
+}
+.xyj__center {
+  grid-area: center;
+  position: relative;
+  min-height: 0;
+}
+.xyj__top {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  translate: -50% 0;
+}
+.xyj__zone {
+  position: absolute;
+  display: flex;
+}
+.xyj__zone.is-top {
+  top: 54px;
+  left: 50%;
+  translate: -50% 0;
+}
+/* 对家是全身立绘时，出牌区让到立绘下方 */
+.xyj__center:has(.xyj__top .seat--figure) .xyj__zone.is-top {
+  top: 156px;
+}
+.xyj__zone.is-left {
+  left: 0;
+  top: 32%;
+}
+.xyj__zone.is-right {
+  right: 0;
+  top: 32%;
+}
+.xyj__zone.is-me {
+  bottom: 2px;
+  left: 50%;
+  translate: -50% 0;
+}
+.xyj__me {
+  grid-area: me;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 54px;
+  padding: 4px 0 6px;
+}
+.xyj__myseat {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  translate: 0 -50%;
+}
+.xyj__hand {
+  grid-area: hand;
+  padding: 0 2%;
+}
+
+/* 牌面：左上角点数下写身份名 */
+.xyj .pcard__rank {
+  order: 0;
+}
+.xyj .pcard__suit {
+  order: 2;
+}
+.xyj .pcard__index::after {
+  order: 1;
+  writing-mode: vertical-rl;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: calc(var(--w) * 0.17);
+  line-height: 1.05;
+  letter-spacing: 0.02em;
+  margin-top: calc(var(--w) * 0.02);
+}
+.xyj .pcard[data-rank='10'] .pcard__index::after {
+  content: '师傅';
+}
+.xyj .pcard[data-rank='5'] .pcard__index::after {
+  content: '悟空';
+}
+.xyj .pcard[data-rank='8'] .pcard__index::after {
+  content: '八戒';
+}
+.xyj .pcard[data-rank='3'] .pcard__index::after {
+  content: '沙僧';
+}
+.xyj .pcard[data-rank='13'] .pcard__index::after {
+  content: '大妖';
+}
+.xyj .pcard[data-rank='12'] .pcard__index::after {
+  content: '中妖';
+}
+.xyj .pcard[data-rank='11'] .pcard__index::after {
+  content: '小妖';
+}
+.xyj .pcard--joker::after {
+  content: '万能牌';
+  position: absolute;
+  left: calc(var(--w) * 0.08);
+  top: calc(var(--w) * 0.62);
+  writing-mode: vertical-rl;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: calc(var(--w) * 0.15);
+  line-height: 1.05;
+  color: var(--gold, #b8862b);
+}
+
+.xyj__sub {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.xyj__sub em,
+.xyj__score {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--felt-ink-2);
+}
+.xyj__law {
+  opacity: 0.85;
+}
+.xyj__zone {
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.xyj__as {
+  font-size: 12px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--felt-glass);
+  box-shadow: inset 0 0 0 1px var(--felt-line);
+  color: var(--felt-accent);
+}
+.xyj__flip {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-radius: 16px;
+  background: var(--felt-glass);
+  box-shadow: inset 0 0 0 1px var(--felt-line);
+  backdrop-filter: blur(6px);
+  font-size: 13px;
+  color: var(--felt-ink-2);
+  animation: rise-in 0.3s var(--ease-out);
+  z-index: 10;
+  white-space: nowrap;
+}
+.xyj__flip b {
+  color: var(--felt-accent);
+}
+.xyj-declare {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 4px 0 8px;
+}
+.xyj-declare__btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 12px 4px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--ink-1, inherit);
+  font: inherit;
+  cursor: pointer;
+}
+.xyj-declare__btn b {
+  font-size: 16px;
+}
+.xyj-declare__btn small {
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.xyj-declare__btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.xyj-declare__btn:not(:disabled):hover {
+  background: var(--gold-soft);
+}
+
+@media (max-height: 460px) {
+  .xyj__seat {
+    margin-top: -18%;
+  }
+  .xyj__zone.is-top {
+    top: 46px;
+  }
+  .xyj__center:has(.xyj__top .seat--figure) .xyj__zone.is-top {
+    top: 80px;
+  }
+  .xyj__me {
+    min-height: 46px;
+    padding: 2px 0 4px;
+  }
+}
+@media (orientation: portrait) and (max-width: 600px) {
+  .xyj {
+    grid-template-columns: 70px minmax(0, 1fr) 70px;
+    padding: 18px 6px 8px;
+  }
+  .xyj__me {
+    flex-direction: column;
+    gap: 6px;
+  }
+  .xyj__myseat {
+    position: static;
+    translate: none;
+    align-self: flex-start;
+    padding-left: 4px;
+  }
+}
