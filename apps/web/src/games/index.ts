@@ -21,7 +21,11 @@ export interface GameUI {
   /** 大厅卡片上展示的几张牌 */
   showcase: Card[];
   /** 麻将类玩法：大厅卡片上展示的麻将牌 */
-  tiles?: { id: number; suit: 'wan' | 'tiao' | 'tong'; rank: number }[];
+  tiles?: {
+    id: number;
+    suit: 'wan' | 'tiao' | 'tong' | 'feng' | 'jian';
+    rank: number;
+  }[];
   /** 人数说明 */
   people: string;
   /** 额外标签 */
@@ -68,6 +72,30 @@ export const GAME_UIS: GameUI[] = [
       { id: 3, suit: 'tiao', rank: 1 },
     ],
     people: '4 人 · 血战到底',
+  },
+  {
+    id: 'hangzhou',
+    Board: lazy(() => import('./hangzhou/HangzhouBoard')),
+    tint: ['#8a5a3c', '#452a1d'],
+    showcase: [],
+    tiles: [
+      { id: 1, suit: 'wan', rank: 8 },
+      { id: 2, suit: 'jian', rank: 1 },
+      { id: 3, suit: 'tong', rank: 9 },
+    ],
+    people: '4 人 · 白板财神',
+  },
+  {
+    id: 'suichang',
+    Board: lazy(() => import('./suichang/SuichangBoard')),
+    tint: ['#8a5a3c', '#3f2a1c'],
+    showcase: [],
+    tiles: [
+      { id: 1, suit: 'wan', rank: 5 },
+      { id: 2, suit: 'jian', rank: 3 },
+      { id: 3, suit: 'tong', rank: 9 },
+    ],
+    people: '4 人 · 50 筹码',
   },
   {
     id: 'xiangqi',
