@@ -10,7 +10,7 @@ import type { Tile } from './tiles';
  *
  * 平胡 = 0 番 = 1 倍；倍数 = 2^番；不封顶。
  * 牌型番相加，自摸 +1、杠上开花 +1、天胡 / 地胡 +2（不再叠自摸）、
- * 飞财自摸 +1（只有飞财者）、爆头 +1。
+ * 飞财自摸 +1（只有飞财者）、敲头 +1。
  * 付款基数：涉及庄家就用庄家底分（6/8/10…），两个闲家之间用 5。
  */
 
@@ -27,12 +27,12 @@ export type FanId =
   | 'buda_ultra'
   | 'qifeng'
   | 'quanluodi'
+  | 'qiaotou'
   | 'zimo'
   | 'gangshanghua'
   | 'tianhu'
   | 'dihu'
-  | 'feicai'
-  | 'baotou';
+  | 'feicai';
 
 export const FAN_NAME: Record<FanId, string> = {
   pinghu: '平胡',
@@ -47,12 +47,12 @@ export const FAN_NAME: Record<FanId, string> = {
   buda_ultra: '超豪华不搭',
   qifeng: '七风',
   quanluodi: '全落地',
+  qiaotou: '敲头',
   zimo: '自摸',
   gangshanghua: '杠上开花',
   tianhu: '天胡',
   dihu: '地胡',
   feicai: '飞财自摸',
-  baotou: '爆头',
 };
 
 export interface MeldShape {
@@ -67,7 +67,7 @@ export interface WinContext {
   dihu: boolean;
   /** 飞财者的下一次摸牌自摸 */
   flyBonus: boolean;
-  /** 爆头（财神做将，听所有牌） */
+  /** 敲头（财神做将，听所有牌） */
   explosive: boolean;
 }
 
@@ -107,7 +107,7 @@ function suitsOfHand(counts: readonly number[], melds: readonly MeldShape[]): Se
 
 /**
  * 评估一手和牌。`concealed` 已包含和进的那张牌；不能和牌返回 null。
- * 爆头、飞财、天胡 / 地胡由调用方在 ctx 里给出。
+ * 敲头、飞财、天胡 / 地胡由调用方在 ctx 里给出。
  */
 export function evaluateWin(
   concealed: readonly Tile[],
@@ -154,6 +154,8 @@ export function evaluateWin(
       if (qing) qiduiItems.push(['qingyise', 2]);
       else if (hun) qiduiItems.push(['hunyise', 1]);
       if (zi) qiduiItems.push(['ziyise', 3]);
+      // 七对敲头：6 个对子 + 1 张财神，胡任意牌；与七对/豪华同属七对番型
+      if (jokers === 1) qiduiItems.push(['qiaotou', 1]);
     }
     const sum = (arr: [FanId, number][]) => arr.reduce((a, b) => a + b[1], 0);
     const chosen = qiduiItems.length && sum(qiduiItems) > sum(standard) ? qiduiItems : standard;
@@ -171,7 +173,7 @@ export function evaluateWin(
   // 全落地：吃碰杠之后手牌只剩一张（4 组副露 + 将）
   if (meldCount === 4) items.push({ id: 'quanluodi', fan: 1 });
 
-  if (ctx.explosive) items.push({ id: 'baotou', fan: 1 });
+  if (ctx.explosive) items.push({ id: 'qiaotou', fan: 1 });
   if (ctx.tianhu) items.push({ id: 'tianhu', fan: 2 });
   else if (ctx.dihu) items.push({ id: 'dihu', fan: 2 });
   else if (ctx.selfDrawn) items.push({ id: 'zimo', fan: 1 });

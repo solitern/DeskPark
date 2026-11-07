@@ -183,17 +183,38 @@ describe('遂昌麻将 · 番与计分', () => {
     expect(withJoker.buda).toBe('luxury');
   });
 
-  it('爆头：财神做将，听所有牌，只能自摸', () => {
+  it('敲头：财神做将，听所有牌，只能自摸', () => {
     const jokerKind = kindOf('1p');
     const pool = new Pool();
     const joker = { ...pool.one(jokerKind), joker: true };
     const tiles = [...pool.tiles('123m 456m 789m 123s'), joker, pool.one(kindOf('5p'))];
     const v = sz.evaluateWin(tiles, [], jokerKind, { ...CTX, selfDrawn: true, explosive: true })!;
-    expect(v.fan).toBe(2); // 爆头 1 + 自摸 1
-    // 13 张的爆头听牌形
+    expect(v.fan).toBe(2); // 敲头 1 + 自摸 1
+    // 13 张的敲头听牌形
     const hand13 = [...pool.tiles('123m 456m 789m 123s'), joker];
     expect(sz.isExplosiveHand(hand13, jokerKind, 0)).toBe(true);
     expect(sz.handWaits(hand13, jokerKind, 0)).toHaveLength(34);
+  });
+
+  it('七对敲头：6 个对子 + 财神，胡任意牌，3 番（8 倍）', () => {
+    const jokerKind = kindOf('1s');
+    const v = win('11m 33m 55m 77m 99m 11p 5p 1s', [], jokerKind, { selfDrawn: true })!;
+    expect(v.patterns.map((p) => p.id)).toEqual(
+      expect.arrayContaining(['qidui', 'qiaotou', 'zimo']),
+    );
+    expect(v.fan).toBe(3); // 七对 1 + 敲头 1 + 自摸 1
+    // 听任意牌
+    const pool = new Pool();
+    const joker = { ...pool.one(jokerKind), joker: true };
+    const hand13 = [...pool.tiles('11m 33m 55m 77m 99m 11p'), joker];
+    expect(sz.isSevenPairsQiaotouHand(hand13, jokerKind)).toBe(true);
+    expect(sz.handWaits(hand13, jokerKind, 0)).toHaveLength(34);
+    // 豪华七对敲头：豪华 +1，共 4 番（16 倍）
+    const hh = win('1111p 22m 33m 44m 55m 6p 1s', [], jokerKind, { selfDrawn: true })!;
+    expect(hh.patterns.map((p) => p.id)).toEqual(
+      expect.arrayContaining(['qidui', 'haohua', 'qiaotou', 'zimo']),
+    );
+    expect(hh.fan).toBe(4);
   });
 
   it('白板当一万：白板 23789万 123筒 123条 东东 可以胡', () => {
@@ -443,7 +464,7 @@ describe('遂昌麻将 · 行牌', () => {
     expect(s.flyBonus[0]).toBe(true);
   });
 
-  it('爆头不听点炮：4 面 + 财神 的牌型不会被别人点炮胡', () => {
+  it('敲头不听点炮：4 面 + 财神 的牌型不会被别人点炮胡', () => {
     const pool = new Pool();
     const jokerKind = kindOf('1p');
     const joker = { ...pool.one(jokerKind), joker: true };
@@ -458,6 +479,25 @@ describe('遂昌麻将 · 行牌', () => {
     s = act(s, 0, { type: 'discard', tile: five.id });
     expect(s.window).toBeNull();
     expect(s.turn).toBe(1);
+  });
+
+  it('七对敲头不听点炮：6 对 + 财神 只能自摸', () => {
+    const pool = new Pool();
+    const jokerKind = kindOf('1s');
+    const joker = { ...pool.one(jokerKind), joker: true };
+    const one = pool.one(kindOf('1m'));
+    const players = [
+      player({ hand: [...pool.tiles(JUNK[0]), one] }),
+      player({ hand: [...pool.tiles('11m 33m 55m 77m 99m 11p'), joker] }),
+      player({ hand: pool.tiles(JUNK[2]) }),
+      player({ hand: pool.tiles(JUNK[3]) }),
+    ];
+    let s = baseState(players, { turn: 0, jokerKind });
+    s = act(s, 0, { type: 'discard', tile: one.id });
+    // 1 号位可以碰 1 万，但不能点炮胡
+    expect(s.window).not.toBeNull();
+    expect(s.window!.options[1] ?? []).not.toContain('hu');
+    expect(s.window!.options[1] ?? []).toContain('peng');
   });
 });
 

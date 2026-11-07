@@ -36,12 +36,12 @@ export function splitTiles(
   return { real, jokers };
 }
 
-/** 手牌排序：万条筒在前、字牌在后；财神放最后，白板替身按它替的那张牌排。 */
+/** 手牌排序：财神放最左、白板替身放最右，中间按万条筒、字牌排。 */
 export function sortTiles(tiles: readonly Tile[], jokerKind: number | null = null): Tile[] {
-  const joker = (t: Tile) => jokerKind !== null && !!t.joker;
+  const group = (t: Tile) => (jokerKind !== null && t.joker ? 0 : t.sub ? 2 : 1);
   return [...tiles].sort(
     (a, b) =>
-      Number(joker(a)) - Number(joker(b)) ||
+      group(a) - group(b) ||
       hzKindOf(a) - hzKindOf(b) ||
       a.rank - b.rank ||
       a.id - b.id,

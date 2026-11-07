@@ -47,7 +47,16 @@ function Melds({ melds, w }: { melds: SZ.SzMeldView[]; w: string }) {
       {melds.map((m, i) => (
         <div key={i} className={`sz-meld ${m.kongType === 'an' ? 'is-an' : ''}`}>
           {m.tiles
-            ? m.tiles.map((t) => <MahjongTile key={t.id} tile={t} w={w} />)
+            ? m.tiles.map((t) => (
+                <MahjongTile
+                  key={t.id}
+                  tile={t.sub ? { id: t.id, suit: 'jian' as const, rank: 3 } : t}
+                  w={w}
+                  badge={t.joker ? '财' : t.sub ? sz.kindName(sz.hzKindOf(t)) : undefined}
+                  joker={!!t.joker}
+                  className={t.sub ? 'is-sub' : undefined}
+                />
+              ))
             : Array.from({ length: 4 }, (_, j) => <MahjongTile key={j} faceDown w={w} />)}
           {m.kongType === 'an' && <span className="sz-meld__tag">暗</span>}
         </div>
@@ -69,13 +78,15 @@ function River({
     <div className={`sz-river is-${pos}`}>
       {river.map((r) => {
         const joker = !!r.tile.joker;
+        const shown = r.tile.sub ? { id: r.tile.id, suit: 'jian' as const, rank: 3 } : r.tile;
+        const badge = joker ? '财' : r.tile.sub ? sz.kindName(sz.hzKindOf(r.tile)) : undefined;
         return (
           <MahjongTile
             key={r.tile.id}
-            tile={r.tile}
+            tile={shown}
             w="var(--rw)"
             highlight={r.tile.id === lastId}
-            badge={joker ? '财' : r.tile.sub ? '白' : undefined}
+            badge={badge}
             joker={joker}
             className={`${r.claimedBy?.length ? 'is-claimed' : ''} ${r.tile.sub ? 'is-sub' : ''}`}
           />
@@ -127,7 +138,7 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
   const units =
     v.hand.length + (drawnTile ? 0.6 : 0) + meldTiles * 0.78 + mine.melds.length * 0.3 + 0.8;
   const maxByHeight = typeof window !== 'undefined' ? Math.min(64, window.innerHeight * 0.1) : 56;
-  const tw = Math.max(21, Math.min(maxByHeight, (width - 24) / Math.max(units, 8)));
+  const tw = Math.max(25, Math.min(maxByHeight, (width - 24) / Math.max(units, 8)));
 
   const seen = useRef(v.events.at(-1)?.seq ?? 0);
   const [shouts, setShouts] = useState<{ id: number; seat: number; text: string }[]>([]);
@@ -147,12 +158,16 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
     }
   }, [v.events, me]);
 
+  const isQiaotouHand = (hand: Tile[]) =>
+    sz.isExplosiveHand(hand, jokerKind, mine.melds.length) ||
+    sz.isSevenPairsQiaotouHand(hand, jokerKind);
+
   const explosiveNow = useMemo(() => {
     if (v.phase !== 'play') return false;
-    if (v.hand.length % 3 === 1) return sz.isExplosiveHand(v.hand, jokerKind, mine.melds.length);
+    if (v.hand.length % 3 === 1) return isQiaotouHand(v.hand);
     if (drawnTile) {
       const pre = v.hand.filter((t) => t.id !== drawnTile.id);
-      return sz.isExplosiveHand(pre, jokerKind, mine.melds.length);
+      return isQiaotouHand(pre);
     }
     return false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -178,6 +193,10 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
   };
 
   const isJoker = (t: Tile) => !!t.joker;
+  const subName = (t: Tile) =>
+    t.sub && jokerKind !== null ? sz.kindName(jokerKind) : t.sub ? '白' : undefined;
+  /** 白板保留牌面，只在对局语义上当翻出的那张牌；显示时换回白板脸 */
+  const shownTile = (t: Tile) => (t.sub ? { id: t.id, suit: 'jian' as const, rank: 3 } : t);
 
   /** 可以胡的时候，双击手牌不再直接打出，先确认，避免误打 */
   const onTile = (t: Tile) => {
@@ -227,9 +246,9 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
         onClick={() => onTile(t)}
       >
         <MahjongTile
-          tile={t}
+          tile={shownTile(t)}
           selected={sel.includes(t.id)}
-          badge={joker ? '财' : t.sub ? '白' : undefined}
+          badge={joker ? '财' : subName(t)}
           joker={joker}
           className={t.sub ? 'is-sub' : undefined}
         />
@@ -257,7 +276,16 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
           <Melds melds={p.melds} w="var(--rw)" />
           <div className="sz-backs">
             {p.hand
-              ? p.hand.map((t) => <MahjongTile key={t.id} tile={t} w="var(--rw)" />)
+              ? p.hand.map((t) => (
+                  <MahjongTile
+                    key={t.id}
+                    tile={t.sub ? { id: t.id, suit: 'jian' as const, rank: 3 } : t}
+                    w="var(--rw)"
+                    badge={t.joker ? '财' : t.sub ? sz.kindName(sz.hzKindOf(t)) : undefined}
+                    joker={!!t.joker}
+                    className={t.sub ? 'is-sub' : undefined}
+                  />
+                ))
               : Array.from({ length: p.handCount }, (_, i) => (
                   <MahjongTile key={i} faceDown w="calc(var(--rw) * 0.86)" />
                 ))}
@@ -311,7 +339,7 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
               <MahjongTile
                 tile={{ id: -100, suit: sz.kindSuit(33), rank: sz.kindRank(33) }}
                 w="18px"
-                badge="白"
+                badge={sz.kindName(jokerKind)}
                 className="is-sub"
               />
             )}
@@ -388,14 +416,14 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
                 {v.window?.kind === 'rob'
                   ? '可以抢杠胡！'
                   : explosiveNow
-                    ? '可以爆头！'
+                    ? '可以敲头！'
                     : '可以胡牌！'}
               </span>
               <Button variant="gold" className="sz-hu-btn" onClick={() => act({ type: 'hu' })}>
                 {v.window?.kind === 'rob'
                   ? '抢杠胡'
                   : explosiveNow
-                    ? '爆头'
+                    ? '敲头'
                     : v.drawn !== null
                       ? '自摸'
                       : '胡'}
@@ -462,7 +490,7 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
                   className="sz-hu-btn"
                   onClick={() => act({ type: 'hu' })}
                 >
-                  {explosiveNow ? '爆头' : '自摸'}
+                  {explosiveNow ? '敲头' : '自摸'}
                 </Button>
               )}
               {L.gang.map((g) => {
@@ -505,7 +533,13 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
         </div>
         {(previewWaits.length > 0 || explosiveNow) && v.phase === 'play' && (
           <div className="sz-ting">
-            <span>{explosiveNow ? '爆头·听所有牌' : sel.length === 1 ? '打出后听' : '听牌'}</span>
+            <span>
+              {explosiveNow
+                ? '敲头·听所有牌（只能自摸）'
+                : sel.length === 1
+                  ? '打出后听'
+                  : '听牌'}
+            </span>
             {previewWaits.slice(0, 12).map((k) => {
               const total = jokerKind === k ? (jokerKind === 33 ? 3 : 7) : 4;
               const left = Math.max(0, total - v.visible[k]);
@@ -601,7 +635,9 @@ function RoundResult({
       : '本盘结束'
     : myWin
       ? myWin.selfDrawn
-        ? '自摸'
+        ? myWin.score.patterns.some((p) => p.id === 'qiaotou')
+          ? '敲头'
+          : '自摸'
         : myWin.robbing
           ? '抢杠胡'
           : '胡牌'
@@ -631,7 +667,9 @@ function RoundResult({
   const pending = r.pending;
   const clauseText = (c: string) => sz.CLAUSE_NAME[c as sz.Clause] ?? c;
   const isJokerTile = (t: Tile) => !!t.joker;
-  const tileBadge = (t: Tile) => (t.joker ? '财' : t.sub ? '白' : undefined);
+  const shownTile = (t: Tile) => (t.sub ? { id: t.id, suit: 'jian' as const, rank: 3 } : t);
+  const tileBadge = (t: Tile) =>
+    t.joker ? '财' : t.sub ? sz.kindName(sz.hzKindOf(t)) : undefined;
 
   return (
     <Sheet
@@ -768,7 +806,7 @@ function RoundResult({
                   .map((t) => (
                     <MahjongTile
                       key={`w-${t.id}`}
-                      tile={t}
+                      tile={shownTile(t)}
                       w="var(--rw)"
                       highlight
                       badge={tileBadge(t)}
@@ -781,7 +819,7 @@ function RoundResult({
                   .map((t) => (
                     <MahjongTile
                       key={t.id}
-                      tile={t}
+                      tile={shownTile(t)}
                       w="var(--rw)"
                       badge={tileBadge(t)}
                       joker={isJokerTile(t)}

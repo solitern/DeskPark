@@ -4,7 +4,7 @@ import { sevenPairsRaw, standardWinRaw, total } from '../../mahjong/analysis136'
 export * from '../../mahjong/analysis136';
 
 /**
- * 遂昌麻将特有牌型：不搭（十三烂类）、七风、爆头。
+ * 遂昌麻将特有牌型：不搭（十三烂类）、七风、敲头。
  *
  * 这里的 real 是「真实牌」的计数，jokers 是财神（万能牌）张数。
  * 注意：白板在这一轮会被当成翻出的那张牌（普通牌，例如一万），
@@ -268,10 +268,15 @@ export function allSets(real: readonly number[], jokers: number, setsNeeded: num
   return rec(0, jokers);
 }
 
-/** 13 张手牌是不是「爆头」的听牌形：去掉一张财神后正好是 4 组面子 */
+/** 13 张手牌是不是「敲头」的听牌形：去掉一张财神后正好是 4 组面子 */
 export function explosiveWait(real: readonly number[], jokers: number, melds: number): boolean {
   if (jokers === 0) return false;
   return allSets(real, jokers - 1, 4 - melds);
+}
+
+/** 13 张手牌是不是七对敲头：6 个对子 + 1 张财神，听任意牌 */
+export function sevenPairsQiaotouWait(real: readonly number[], jokers: number): boolean {
+  return jokers === 1 && total(real) === 12 && real.every((n) => n % 2 === 0);
 }
 
 /** 14 张（或加副露）是否和牌：标准型 / 七对 / 不搭 */
@@ -283,7 +288,7 @@ export function isWin14(real: readonly number[], jokers: number, melds: number):
 }
 
 /**
- * 听牌：再进哪些牌可以和牌（含不搭与爆头）。
+ * 听牌：再进哪些牌可以和牌（含不搭与敲头）。
  * 一万既是财神（万能）又有白板替身（普通一万），所以两边的进张都要算。
  */
 export function waits(

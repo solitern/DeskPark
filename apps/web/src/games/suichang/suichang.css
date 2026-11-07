@@ -506,16 +506,27 @@
   justify-content: center;
   gap: calc(var(--tw) * 0.6);
   padding-top: calc(var(--tw) * 0.34);
+  min-width: 0;
+  max-width: 100%;
 }
 .sz-hand__tiles {
   display: flex;
   gap: 1px;
+  max-width: 100%;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+.sz-hand__tiles::-webkit-scrollbar {
+  display: none;
 }
 .sz-hand__drawn {
   margin-left: calc(var(--tw) * 0.12);
+  flex: none;
 }
 .sz-handtile {
   position: relative;
+  flex: none;
   cursor: pointer;
   animation: deal-in 0.35s var(--ease-out) both;
 }

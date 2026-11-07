@@ -7,14 +7,14 @@ import {
   isHonor,
   kindRank,
   kindSuit,
-  sortTiles,
 } from '../../mahjong/tiles136';
-import { explosiveWait, waits } from './analysis';
+import { explosiveWait, sevenPairsQiaotouWait, waits } from './analysis';
 import { szAiPrompt } from './ai';
 import { suichangBot } from './bot';
 import type { MeldShape, WinScore } from './scoring';
 import {
   JIAN_BAI,
+  sortTiles,
   splitTiles,
   type Tile,
 } from './tiles';
@@ -366,7 +366,7 @@ function isTianhu(state: SzState, seat: Seat, p: SzPlayer): boolean {
   return seat === state.dealer && state.discards === 0 && state.claims === 0 && !p.hasDrawn;
 }
 
-/** 自摸时的爆头判定：把摸到的那张拿掉，剩下的 13 张是不是「4 组面子 + 财神」 */
+/** 自摸时的敲头判定：把摸到的那张拿掉，剩下的 13 张是不是「4 组面子 + 财神」 */
 function explosiveOf(state: SzState, p: SzPlayer): boolean {
   if (state.jokerKind === null || state.drawn === null) return false;
   const pre = p.hand.filter((t) => t.id !== state.drawn);
@@ -374,10 +374,11 @@ function explosiveOf(state: SzState, p: SzPlayer): boolean {
   return explosiveWait(real, jokers, p.melds.length);
 }
 
-/** 这张牌能不能点炮胡（爆头不能点炮） */
+/** 这张牌能不能点炮胡（敲头不能点炮，包括七对敲头） */
 function canRon(state: SzState, p: SzPlayer, tile: HzTile): boolean {
   const { real, jokers } = splitTiles(p.hand, state.jokerKind);
   if (explosiveWait(real, jokers, p.melds.length)) return false;
+  if (p.melds.length === 0 && sevenPairsQiaotouWait(real, jokers)) return false;
   return !!scoreFor(state, p, tile, false);
 }
 
@@ -843,7 +844,7 @@ export function waitsAfter(state: SzState, seat: Seat, tileId: number): number[]
   return waits(real, jokers, state.jokerKind, p.melds.length);
 }
 
-/** 手牌是否爆头（白板替身不算财神） */
+/** 手牌是否敲头（4 面子 + 财神；白板替身不算财神） */
 export function isExplosiveHand(
   hand: readonly Tile[],
   jokerKind: number | null,
@@ -851,6 +852,15 @@ export function isExplosiveHand(
 ): boolean {
   const { real, jokers } = splitTiles(hand, jokerKind);
   return explosiveWait(real, jokers, melds);
+}
+
+/** 手牌是否是七对敲头的 13 张听牌形（6 对 + 财神） */
+export function isSevenPairsQiaotouHand(
+  hand: readonly Tile[],
+  jokerKind: number | null,
+): boolean {
+  const { real, jokers } = splitTiles(hand, jokerKind);
+  return sevenPairsQiaotouWait(real, jokers);
 }
 
 /** 手牌听牌（给界面用，自动拆出财神） */
@@ -879,9 +889,9 @@ export const suichang: GameDefinition<SzState, SzAction, SzView, SzOptions> = {
       '翻财神：从牌墙尾翻一张，翻到的牌的种类就是财神；翻开的这张移出牌墙，所以该种类只剩 3 张万能牌（可当任意牌胡、可做将、可单吊，不能碰杠吃）。白板全部变成该种类的普通牌（例如翻到一万，4 张白板都当一万，可以吃碰杠、可以点炮；翻到白板时则 3 张白板是万能牌）。',
       '飞财：主动打出财神叫飞财。飞财后下、对、上家各摸一次的「一圈」内，所有人只能摸牌进张、只能自摸，不能吃碰、明杠、抢杠和点炮胡；暗杠、补杠可以。飞财者本人下一次摸牌自摸 +1 番。',
       '行牌：只能吃上家；碰、明杠、暗杠、补杠；杠后从牌墙尾补牌；补杠可以被抢杠；多人能胡时截胡，只算离出牌者最近的一家，其余两家仍各付一份。',
-      '胡牌：4 面子 + 1 将、七对、豪华七对、清一色、混一色、碰碰胡、字一色、不搭（普通 / 正规 / 豪华 / 超豪华 / 七风）、全落地（吃碰杠后手牌只剩一张）；一家胡牌本局结束。',
+      '胡牌：4 面子 + 1 将、七对、豪华七对、清一色、混一色、碰碰胡、字一色、不搭（普通 / 正规 / 豪华 / 超豪华 / 七风）、全落地（吃碰杠后手牌只剩一张）、七对敲头 / 豪华七对敲头；一家胡牌本局结束。',
       '平胡 0 番 = 1 倍，倍数 = 2^番，不封顶；碰碰胡、混一色、七对各 +1，清一色 +2，字一色 +3（可叠碰碰胡），豪华七对 +1（七对共 2 番），不搭正规 +1 / 豪华 +2 / 超豪华 +3，七风 +1（七张字牌齐全，不能用财神补缺），全落地 +1。',
-      '过程番：自摸 +1、杠上开花 +1、天胡 / 地胡 +2（不再叠自摸）、飞财自摸 +1、爆头 +1（财神做将，只能自摸，不能点炮）。',
+      '过程番：自摸 +1、杠上开花 +1、天胡 / 地胡 +2（不再叠自摸）、飞财自摸 +1、敲头 +1（4 面子 + 财神，或 6 个对子 + 财神；听所有牌，只能自摸，不能点炮）。七对敲头 = 七对 1 + 敲头 1 + 自摸 1 = 3 番（8 倍）；豪华七对敲头再加豪华 1 = 4 番（16 倍）。',
       '付款：自摸三家各付；点炮者付双份、其余两家各付一份；底分 5，涉及庄家时按庄家底分（6 / 8 / 10…，连庄 +2，无上限）。',
       '抢杠承包：抢杠胡只有被抢杠的人付，底分按 50、按牌型番翻倍，等一盘结束再结算。',
       '荒庄：牌墙留 34 张不摸（摸完 102 张）即荒庄，庄家给其余三家各 5 分，庄家继续坐庄；连庄底分 +2。',
