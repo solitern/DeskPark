@@ -502,13 +502,41 @@ describe('遂昌麻将 · 行牌', () => {
 });
 
 describe('遂昌麻将 · 调试', () => {
-  it('debug 把指定牌种移到牌墙最前面', () => {
+  it('debug 为指定座位预留下一张牌', () => {
     const pool = new Pool();
     const players = [0, 1, 2, 3].map(() => player());
     const s = baseState(players, { wall: pool.tiles('1m 2m 3m 4m') });
     const next = act(s, 0, { type: 'debug', kind: kindOf('3m') });
-    expect(hz.hzKindOf(next.wall[0])).toBe(kindOf('3m'));
-    expect(next.wall.map((t) => t.id).sort()).toEqual(s.wall.map((t) => t.id).sort());
+    expect(next.debugDraw?.seat).toBe(0);
+    expect(hz.hzKindOf(next.debugDraw!.tile)).toBe(kindOf('3m'));
+    expect(next.wall.map((t) => hz.hzKindOf(t))).not.toContain(kindOf('3m'));
+    expect(next.wall).toHaveLength(3);
+  });
+
+  it('debug 的牌留给指定座位，不会给下一位摸牌的人', () => {
+    const pool = new Pool();
+    const one = pool.one(kindOf('1m'));
+    const debugTile = pool.one(kindOf('3m'));
+    const players = [
+      player({ hand: [...pool.tiles(JUNK[0]), one] }),
+      player({ hand: pool.tiles(JUNK[1]) }),
+      player({ hand: pool.tiles(JUNK[2]) }),
+      player({ hand: pool.tiles(JUNK[3]) }),
+    ];
+    let s = baseState(players, {
+      turn: 0,
+      wall: pool.tiles('2m 4m 5m 6m'),
+      debugDraw: { seat: 1, tile: debugTile },
+    });
+    s = act(s, 0, { type: 'discard', tile: one.id });
+    while (s.window) {
+      const waiter = s.window.required.findIndex(
+        (r, idx) => r && s.window!.decisions[idx] === null,
+      );
+      s = act(s, waiter, { type: 'pass' });
+    }
+    expect(s.players[1].hand.some((t) => t.id === debugTile.id)).toBe(true);
+    expect(s.debugDraw).toBeNull();
   });
 
   it('debug 指定的牌不在牌墙里时校验失败', () => {

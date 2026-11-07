@@ -237,7 +237,7 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
       toast(err, 'error');
       return;
     }
-    toast(`下一张：${sz.kindName(kind)}`);
+    toast(`已预留：${sz.kindName(kind)}（你下次摸牌）`);
     setDebugOpen(false);
   };
 
@@ -677,8 +677,8 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
       <Sheet
         open={debugOpen}
         onClose={() => setDebugOpen(false)}
-        title="调试：设置下一张牌"
-        subtitle="点击一张牌，把它移到牌墙最前面，下一次摸牌就是它"
+        title="调试：设置我下一次摸的牌"
+        subtitle="选一张牌，留到你下一次摸牌时拿到；中间别人摸牌不会把它摸走"
         wide
       >
         <div className="sz-debug-grid">
@@ -698,7 +698,7 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
           ))}
         </div>
         <p className="sz-debug-note">
-          只会改牌墙顺序，不会凭空造牌；牌墙里已经没有这张时会提示。仅用于本地测试。
+          会从牌墙里预留一张同种牌给你，不会凭空造牌；牌墙里没有时会提示。仅用于本地测试。
         </p>
       </Sheet>
 

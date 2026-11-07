@@ -213,6 +213,8 @@ export interface SzState {
   /** 飞财的那一圈：seat 打的财神，left 表示还有几家的正常摸牌 */
   fly: { seat: Seat; left: number } | null;
   flyBonus: boolean[];
+  /** 调试：指定座位下一次摸到的牌（先从牌墙取出暂存） */
+  debugDraw: { seat: Seat; tile: HzTile } | null;
   roundLedger: LedgerEntry[];
   /** 抢杠承包与三清，等一盘结束再结算 */
   pending: LedgerEntry[];
@@ -424,6 +426,7 @@ function deal(state: SzState): void {
   const wall = rng.shuffle(createTiles());
   state.rng = rng.state;
   state.round++;
+  state.debugDraw = null;
   state.players = [0, 1, 2, 3].map(() => ({ hand: [], melds: [], river: [], hasDrawn: false }));
   for (let i = 0; i < 13; i++)
     for (let s = 0; s < N; s++) state.players[(state.dealer + s) % N].hand.push(wall.shift()!);
@@ -466,12 +469,14 @@ function deal(state: SzState): void {
 }
 
 function draw(state: SzState, seat: Seat, replacement: boolean): void {
-  if (!canDraw(state)) {
+  const debug = state.debugDraw?.seat === seat ? state.debugDraw.tile : null;
+  if (!canDraw(state) && !debug) {
     endRound(state, 'wall');
     return;
   }
   const p = state.players[seat];
-  const tile = replacement ? state.wall.pop()! : state.wall.shift()!;
+  const tile = debug ?? (replacement ? state.wall.pop()! : state.wall.shift()!);
+  if (debug) state.debugDraw = null;
   const firstDraw = !p.hasDrawn;
   p.hand.push(tile);
   p.hasDrawn = true;
@@ -950,6 +955,7 @@ export const suichang: GameDefinition<SzState, SzAction, SzView, SzOptions> = {
       claims: 0,
       fly: null,
       flyBonus: [false, false, false, false],
+      debugDraw: null,
       roundLedger: [],
       pending: [],
       wins: [],
@@ -1018,7 +1024,9 @@ export const suichang: GameDefinition<SzState, SzAction, SzView, SzOptions> = {
         const idx = state.wall.findIndex((t) => hzKindOf(t) === action.kind);
         if (idx >= 0) {
           const [tile] = state.wall.splice(idx, 1);
-          state.wall.unshift(tile);
+          // 上一次没摸到的调试牌先还回牌墙
+          if (state.debugDraw) state.wall.push(state.debugDraw.tile);
+          state.debugDraw = { seat, tile };
         }
         return state;
       }
