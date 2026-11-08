@@ -15,6 +15,7 @@ import {
   spellstones,
   texas,
   xiangqi,
+  xiyouji,
 } from '../src';
 
 /** 用规则电脑把整局跑一遍，每一步都检查大模型候选动作是否全部合法 */
@@ -66,6 +67,10 @@ describe('大模型接管：候选动作', () => {
   it('斗地主', () => {
     for (let seed = 1; seed <= 6; seed++)
       expect(checkPrompts(doudizhu, 3, { baseScore: 1, rounds: 1 }, seed)).toBeGreaterThan(10);
+  });
+  it('西游记', () => {
+    for (let seed = 1; seed <= 4; seed++)
+      expect(checkPrompts(xiyouji, 4, { rounds: 1 }, seed)).toBeGreaterThan(10);
   });
   it('掼蛋', () => {
     for (let seed = 1; seed <= 3; seed++)

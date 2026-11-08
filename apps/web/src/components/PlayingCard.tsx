@@ -67,7 +67,7 @@ export const PlayingCard = memo(function PlayingCard({
 
   const face = card.rank >= 11 && card.rank <= 13;
   return (
-    <div className={cls} style={s} data-suit={card.suit} {...rest}>
+    <div className={cls} style={s} data-suit={card.suit} data-rank={card.rank} {...rest}>
       <div className="pcard__index">
         <span className={`pcard__rank ${card.rank === 10 ? 'is-ten' : ''}`}>
           {rankText(card.rank)}

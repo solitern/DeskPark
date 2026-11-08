@@ -18,6 +18,7 @@ import { sichuan } from './games/sichuan';
 import { spellstones } from './games/spellstones';
 import { texas } from './games/texas';
 import { xiangqi } from './games/xiangqi';
+import { xiyouji } from './games/xiyouji';
 
 export * as ddz from './games/doudizhu';
 export * as gd from './games/guandan';
@@ -30,6 +31,7 @@ export * as hi from './games/hexisle';
 export * as gg from './games/gemguild';
 export * as ch from './games/chess';
 export * as xq from './games/xiangqi';
+export * as xyj from './games/xiyouji';
 export * as mj from './mahjong';
 
 export {
@@ -44,6 +46,7 @@ export {
   hexisle,
   gemguild,
   highcard,
+  xiyouji,
 };
 
 // 内置玩法（顺序即大厅展示顺序）
@@ -58,6 +61,7 @@ for (const g of [
   onecard,
   hexisle,
   gemguild,
+  xiyouji,
   highcard,
 ])
   registerGame(g);
