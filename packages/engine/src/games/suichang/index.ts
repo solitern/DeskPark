@@ -363,6 +363,7 @@ function scoreFor(
     dihu: !!opts.dihu,
     flyBonus: !!opts.flyBonus,
     explosive: !!opts.explosive,
+    winningTileId: tile?.id ?? (selfDrawn ? (state.drawn ?? undefined) : undefined),
   });
 }
 

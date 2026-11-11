@@ -75,6 +75,8 @@ export interface WinContext {
   flyBonus: boolean;
   /** 敲头（财神做将，听所有牌） */
   explosive: boolean;
+  /** 和进的那张牌的 id（七对敲头要拿掉它来判断原来的 13 张） */
+  winningTileId?: number;
 }
 
 export interface FanItem {
@@ -136,17 +138,14 @@ export function evaluateWin(
   if (!buda) {
     const qidui = meldCount === 0 && sevenPairsRaw(real, jokers);
     if (!standardWinRaw(real, jokers, setsNeeded) && !qidui) return null;
-    // 七对敲头：这张和牌拿掉后，剩下 13 张加任意牌都能七对（支持多张财神）
+    // 七对敲头：只认自摸，而且要拿掉「和进的那张」后，原来的 13 张听任意牌
     let qiduiQiaotou = false;
-    if (qidui) {
-      for (let k = 0; k < 34 && !qiduiQiaotou; k++) {
-        if (real[k] === 0) continue;
-        const c = [...real];
-        c[k]--;
-        if (sevenPairsQiaotouWait(c, jokers)) qiduiQiaotou = true;
+    if (qidui && ctx.selfDrawn && ctx.winningTileId !== undefined) {
+      const pre = concealed.filter((t) => t.id !== ctx.winningTileId);
+      if (pre.length === 13) {
+        const preSplit = splitTiles(pre, jokerKind);
+        qiduiQiaotou = sevenPairsQiaotouWait(preSplit.real, preSplit.jokers);
       }
-      if (!qiduiQiaotou && jokers > 0 && sevenPairsQiaotouWait(real, jokers - 1))
-        qiduiQiaotou = true;
     }
     const haohua = qidui && real.some((n) => n >= 4);
     const pengpeng =

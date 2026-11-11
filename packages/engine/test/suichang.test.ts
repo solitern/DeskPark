@@ -51,7 +51,11 @@ const win = (spec: string, melds: SZ.MeldShape[] = [], jokerKind: number | null 
   const tiles = new Pool()
     .tiles(spec)
     .map((t) => (jokerKind !== null && hz.hzKindOf(t) === jokerKind ? { ...t, joker: true } : t));
-  return sz.evaluateWin(tiles, melds, jokerKind, { ...CTX, ...ctx });
+  const opts = ctx as Record<string, unknown>;
+  const winningTileId =
+    (opts.winningTileId as number | undefined) ??
+    (opts.selfDrawn ? tiles[tiles.length - 1]?.id : undefined);
+  return sz.evaluateWin(tiles, melds, jokerKind, { ...CTX, ...ctx, winningTileId });
 };
 
 function player(p: Partial<SZ.SzPlayer> = {}): SZ.SzPlayer {
@@ -215,7 +219,7 @@ describe('遂昌麻将 · 番与计分', () => {
 
   it('七对敲头：6 个对子 + 财神，胡任意牌，3 番（8 倍）', () => {
     const jokerKind = kindOf('1s');
-    const v = win('11m 33m 55m 77m 99m 11p 5p 1s', [], jokerKind, { selfDrawn: true })!;
+    const v = win('11m 33m 55m 77m 99m 11p 1s 5p', [], jokerKind, { selfDrawn: true })!;
     expect(v.patterns.map((p) => p.id)).toEqual(
       expect.arrayContaining(['qidui', 'qiaotou', 'zimo']),
     );
@@ -227,16 +231,24 @@ describe('遂昌麻将 · 番与计分', () => {
     expect(sz.isSevenPairsQiaotouHand(hand13, jokerKind)).toBe(true);
     expect(sz.handWaits(hand13, jokerKind, 0)).toHaveLength(34);
     // 豪华七对敲头：豪华 +1，共 4 番（16 倍）
-    const hh = win('1111p 22m 33m 44m 55m 6p 1s', [], jokerKind, { selfDrawn: true })!;
+    const hh = win('1111p 22m 33m 44m 55m 1s 6p', [], jokerKind, { selfDrawn: true })!;
     expect(hh.patterns.map((p) => p.id)).toEqual(
       expect.arrayContaining(['qidui', 'haohua', 'qiaotou', 'zimo']),
     );
     expect(hh.fan).toBe(4);
   });
 
+  it('多财神七对点炮只算七对，不算敲头', () => {
+    const jokerKind = kindOf('1s');
+    const v = win('11m 33m 55m 77m 99m 2p 1s 1s 5p', [], jokerKind)!;
+    expect(v.patterns.map((p) => p.id)).toContain('qidui');
+    expect(v.patterns.map((p) => p.id)).not.toContain('qiaotou');
+    expect(v.fan).toBe(1);
+  });
+
   it('多财神七对敲头：两个财神也听任意牌', () => {
     const jokerKind = kindOf('1s');
-    const v = win('11m 33m 55m 77m 99m 2p 5p 1s 1s', [], jokerKind, {
+    const v = win('11m 33m 55m 77m 99m 2p 1s 1s 5p', [], jokerKind, {
       selfDrawn: true,
     })!;
     expect(v.patterns.map((p) => p.id)).toEqual(
@@ -530,6 +542,27 @@ describe('遂昌麻将 · 行牌', () => {
     let s = baseState(players, { turn: 0, jokerKind });
     s = act(s, 0, { type: 'discard', tile: one.id });
     // 1 号位可以碰 1 万，但不能点炮胡
+    expect(s.window).not.toBeNull();
+    expect(s.window!.options[1] ?? []).not.toContain('hu');
+    expect(s.window!.options[1] ?? []).toContain('peng');
+  });
+  it('多财神七对敲头不听点炮', () => {
+    const pool = new Pool();
+    const jokerKind = kindOf('1s');
+    const jokers = [
+      { ...pool.one(jokerKind), joker: true },
+      { ...pool.one(jokerKind), joker: true },
+    ];
+    const one = pool.one(kindOf('1m'));
+    const players = [
+      player({ hand: [...pool.tiles(JUNK[0]), one] }),
+      player({ hand: [...pool.tiles('11m 33m 55m 77m 99m 2p'), ...jokers] }),
+      player({ hand: pool.tiles(JUNK[2]) }),
+      player({ hand: pool.tiles(JUNK[3]) }),
+    ];
+    let s = baseState(players, { turn: 0, jokerKind });
+    s = act(s, 0, { type: 'discard', tile: one.id });
+    // 1 号位可以碰 1 万，但多财神敲头也只能自摸
     expect(s.window).not.toBeNull();
     expect(s.window!.options[1] ?? []).not.toContain('hu');
     expect(s.window!.options[1] ?? []).toContain('peng');
