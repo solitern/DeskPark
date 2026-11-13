@@ -421,6 +421,18 @@ describe('遂昌麻将 · 支付', () => {
     expect(s.result!.pending).toHaveLength(1);
     expect(s.result!.pending[0]).toMatchObject({ from: 0, to: 1, due: 50, clause: 'pay.rob' });
     expect(s.chips).toEqual([50, 50, 50, 50]);
+    // 抢杠只结束本局，整盘继续
+    expect(s.result!.sessionEnded).toBe(false);
+    // 计分面板用的数据：本盘待结算 + 每局流水（番型、账目）
+    const view = suichang.view(s, 1);
+    expect(view.pending).toEqual(s.result!.pending);
+    expect(s.history.at(-1)!.wins[0]).toMatchObject({
+      seat: 1,
+      robbing: true,
+      patterns: ['pinghu'],
+    });
+    expect(s.history.at(-1)!.pending).toHaveLength(1);
+    expect(s.history.at(-1)!.ledger).toEqual([]);
   });
 
   it('三清：一手把三家都打到 0，每家再付 50', () => {

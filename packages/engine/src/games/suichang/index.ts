@@ -11,7 +11,7 @@ import {
 import { buDaWaits, explosiveWait, sevenPairsQiaotouWait, waits } from './analysis';
 import { szAiPrompt } from './ai';
 import { suichangBot } from './bot';
-import type { MeldShape, WinScore } from './scoring';
+import type { FanId, MeldShape, WinScore } from './scoring';
 import {
   JIAN_BAI,
   sortTiles,
@@ -219,6 +219,8 @@ export interface SzState {
   roundLedger: LedgerEntry[];
   /** 抢杠承包与三清，等一盘结束再结算 */
   pending: LedgerEntry[];
+  /** 本局开始时 `pending` 的长度，用来切出「本局新增的待结算」 */
+  pendingMark: number;
   wins: SzWin[];
   result: SzRoundResult | null;
   sessionResult: SzSessionResult | null;
@@ -229,7 +231,17 @@ export interface SzState {
     reason: 'win' | 'wall';
     deltas: number[];
     chipsAfter: number[];
-    wins: { seat: Seat; fan: number; robbing: boolean }[];
+    wins: {
+      seat: Seat;
+      fan: number;
+      robbing: boolean;
+      selfDrawn?: boolean;
+      from?: Seat | null;
+      patterns?: FanId[];
+    }[];
+    ledger?: LedgerEntry[];
+    /** 这一局新增的待结算（抢杠 / 三清） */
+    pending?: LedgerEntry[];
   }[];
   events: SzEvent[];
   eventSeq: number;
@@ -269,6 +281,8 @@ export interface SzView {
   lastDiscard: { seat: Seat; id: number } | null;
   visible: number[];
   events: SzEvent[];
+  /** 本盘累计待结算（抢杠承包、三清） */
+  pending: LedgerEntry[];
   result: SzRoundResult | null;
   sessionResult: SzSessionResult | null;
   ready: boolean[];
@@ -461,6 +475,7 @@ function deal(state: SzState): void {
   state.fly = null;
   state.flyBonus = [false, false, false, false];
   state.roundLedger = [];
+  state.pendingMark = state.pending.length;
   state.wins = [];
   state.ready = [false, false, false, false];
   state.result = null;
@@ -558,7 +573,16 @@ function endRound(state: SzState, reason: 'win' | 'wall'): void {
     reason,
     deltas,
     chipsAfter: [...state.chips],
-    wins: wins.map((w) => ({ seat: w.seat, fan: w.score.fan, robbing: w.robbing })),
+    wins: wins.map((w) => ({
+      seat: w.seat,
+      fan: w.score.fan,
+      robbing: w.robbing,
+      selfDrawn: w.selfDrawn,
+      from: w.from,
+      patterns: w.score.patterns.map((p) => p.id),
+    })),
+    ledger: [...state.roundLedger],
+    pending: state.pending.slice(state.pendingMark ?? 0),
   });
 
   if (sessionEnded) {
@@ -961,6 +985,7 @@ export const suichang: GameDefinition<SzState, SzAction, SzView, SzOptions> = {
       debugDraw: null,
       roundLedger: [],
       pending: [],
+      pendingMark: 0,
       wins: [],
       result: null,
       sessionResult: null,
@@ -1208,6 +1233,7 @@ export const suichang: GameDefinition<SzState, SzAction, SzView, SzOptions> = {
       lastDiscard: state.lastDiscard,
       visible: visibleCounts(state, seat),
       events: state.events,
+      pending: [...state.pending],
       result: state.result,
       sessionResult: state.sessionResult,
       ready: state.ready,

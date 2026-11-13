@@ -10,6 +10,7 @@ import type { GameController } from '../../lib/controller';
 import { signed } from '../../lib/format';
 import { playSound } from '../../lib/sound';
 import { useTurnCue } from '../shared/trick';
+import { ScorePanel } from './ScorePanel';
 import './suichang.css';
 
 type Ctl = GameController<sz.SzView, sz.SzAction>;
@@ -124,6 +125,7 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
   const [sel, setSel] = useState<number[]>([]);
   const [confirmDiscard, setConfirmDiscard] = useState<number | null>(null);
   const [debugOpen, setDebugOpen] = useState(false);
+  const [scoreOpen, setScoreOpen] = useState(false);
   const debugSeq = useRef<number[]>([]);
   const debugTimer = useRef<number | null>(null);
   const [rootRef, width] = useWidth<HTMLDivElement>();
@@ -418,6 +420,14 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
             飞财 · {ctl.players[v.fly.seat].name}（剩 {v.fly.left} 家）
           </span>
         )}
+        <button
+          type="button"
+          className="chip sz-scorebtn"
+          onClick={() => setScoreOpen(true)}
+          title="查看筹码、待结算和每局流水"
+        >
+          计分
+        </button>
       </div>
 
       <div className="sz-area is-top">{seatBlock(seatAt('top'))}</div>
@@ -635,6 +645,16 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
           </>
         )}
       </div>
+
+      <Sheet
+        open={scoreOpen}
+        onClose={() => setScoreOpen(false)}
+        title="计分"
+        subtitle={`第 ${v.session} 盘 · 第 ${v.round} 局 · 庄家 ${ctl.players[v.dealer]?.name ?? ''}（底分 ${v.dealerBase}）`}
+        wide
+      >
+        <ScorePanel ctl={ctl} v={v} />
+      </Sheet>
 
       {confirmTile && (
         <Sheet
