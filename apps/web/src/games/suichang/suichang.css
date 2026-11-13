@@ -821,3 +821,16 @@
 .sz-score__detail summary {
   cursor: pointer;
 }
+.sz-result-score {
+  margin-top: 8px;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 12.5px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.sz-result-score:hover {
+  color: var(--ink);
+}

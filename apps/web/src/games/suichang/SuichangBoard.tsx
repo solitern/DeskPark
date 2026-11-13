@@ -137,6 +137,13 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
     setConfirmDiscard(null);
   }, [phaseKey]);
 
+  // 局结束弹结算时，先把计分面板收起来，避免盖住结算页；在结算页里可以再次打开
+  const lastPhase = useRef(v.phase);
+  useEffect(() => {
+    if (lastPhase.current !== v.phase) setScoreOpen(false);
+    lastPhase.current = v.phase;
+  }, [v.phase]);
+
   // 刚能胡牌时给一次明显提示（音效 + toast），避免错过
   const huSeen = useRef(false);
   useEffect(() => {
@@ -646,16 +653,6 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
         )}
       </div>
 
-      <Sheet
-        open={scoreOpen}
-        onClose={() => setScoreOpen(false)}
-        title="计分"
-        subtitle={`第 ${v.session} 盘 · 第 ${v.round} 局 · 庄家 ${ctl.players[v.dealer]?.name ?? ''}（底分 ${v.dealerBase}）`}
-        wide
-      >
-        <ScorePanel ctl={ctl} v={v} />
-      </Sheet>
-
       {confirmTile && (
         <Sheet
           open
@@ -723,8 +720,25 @@ export default function SuichangBoard({ ctl }: { ctl: Ctl }) {
       </Sheet>
 
       {(v.phase === 'roundOver' || v.phase === 'matchOver') && v.result && (
-        <RoundResult ctl={ctl} v={v} me={me} spectator={spectator} />
+        <RoundResult
+          ctl={ctl}
+          v={v}
+          me={me}
+          spectator={spectator}
+          onScore={() => setScoreOpen(true)}
+        />
       )}
+
+      {/* 放在结算面板之后，结算页里打开时才能盖在结算页上面 */}
+      <Sheet
+        open={scoreOpen}
+        onClose={() => setScoreOpen(false)}
+        title="计分"
+        subtitle={`第 ${v.session} 盘 · 第 ${v.round} 局 · 庄家 ${ctl.players[v.dealer]?.name ?? ''}（底分 ${v.dealerBase}）`}
+        wide
+      >
+        <ScorePanel ctl={ctl} v={v} />
+      </Sheet>
     </div>
   );
 }
@@ -734,11 +748,13 @@ function RoundResult({
   v,
   me,
   spectator,
+  onScore,
 }: {
   ctl: Ctl;
   v: sz.SzView;
   me: number;
   spectator: boolean;
+  onScore: () => void;
 }) {
   const r = v.result!;
   const matchOver = v.phase === 'matchOver';
@@ -831,6 +847,9 @@ function RoundResult({
             ? ` · 本盘结束（${r.sanqing ? '三清' : '有人清袋'}）`
             : ` · 下局 ${ctl.players[r.nextDealer].name} 坐庄`}
         </div>
+        <button type="button" className="sz-result-score" onClick={onScore}>
+          查看计分面板 · 每局流水与待结算
+        </button>
         <table className="result__table">
           <thead>
             <tr>
