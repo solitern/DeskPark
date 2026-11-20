@@ -51,6 +51,7 @@ function optionSub(o: SC.ScDiscardOption): string {
 export function MahjongCoach({
   view,
   coach,
+  mcBusy,
   judge,
   selected,
   onPick,
@@ -58,6 +59,8 @@ export function MahjongCoach({
 }: {
   view: SC.ScView;
   coach: SC.ScCoach;
+  /** 后台精算还在算 */
+  mcBusy?: boolean;
   judge: SC.ScCoachJudge | null;
   selected: readonly number[];
   onPick: (tile: number) => void;
@@ -148,6 +151,17 @@ export function MahjongCoach({
           <span className="sc-coach__mini">{coach.title || coach.status}</span>
         ) : (
           coach.status && <span className="coach__src">{coach.status}</span>
+        )}
+        {coach.mode === 'mc' ? (
+          <span className="sc-coach__mc" title="已在后台模拟几百局，按模拟的平均得分修正了排序">
+            精算
+          </span>
+        ) : (
+          mcBusy && (
+            <span className="sc-coach__mc is-busy" title="正在后台模拟，算完会修正建议">
+              精算中
+            </span>
+          )
         )}
         <button
           type="button"

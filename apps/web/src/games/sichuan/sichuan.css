@@ -533,6 +533,25 @@
   font-weight: 600;
   color: #24453b;
 }
+.sc-coach__mc {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 99px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #fff;
+  background: #1f5c4f;
+}
+.sc-coach__mc.is-busy {
+  color: #2f6b5c;
+  background: rgba(255, 255, 255, 0.7);
+  animation: sc-coach-pulse 1.2s ease-in-out infinite;
+}
+@keyframes sc-coach-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
 .sc-coach__fold {
   margin-left: auto;
 }

@@ -56,6 +56,8 @@ export interface ScMcStat {
   pChajiao: number;
   /** 模拟局数 */
   n: number;
+  /** 没被淘汰：和最好的那张统计上分不出高下 */
+  kept: boolean;
 }
 
 export interface ScDiscardOption {
@@ -331,7 +333,9 @@ function secondPoint(best: ScDiscardOption, second: ScDiscardOption, lRest: numb
   const z = kindName(second.kind);
   if (why === 'speed') {
     if (second.shanten > best.shanten)
-      return `比打 ${z} 更快：打 ${z} 会变成${shantenName(second.shanten)}，胡牌率只有约 ${pct(second.pWin)}`;
+      return second.route === best.route
+        ? `比打 ${z} 更快：打 ${z} 会变成${shantenName(second.shanten)}，胡牌率只有约 ${pct(second.pWin)}`
+        : `比打 ${z} 更快：打 ${z} 要走「${second.route}」，还差 ${second.shanten} 张才听牌，胡牌率只有约 ${pct(second.pWin)}`;
     return `比打 ${z} 更快：胡牌率约 ${pct(best.pWin)}，打 ${z} 约 ${pct(second.pWin)}`;
   }
   if (why === 'size')
@@ -420,15 +424,19 @@ function coachDiscard(env: Env, mc?: ScCoachOptions['mc']): ScCoach {
   }
 
   let options = cands.map((c) => optionOf(env, c));
-  // 精算结果：有模拟数据的候选按模拟平均分排在前面
+  // 精算结果：模拟后没被淘汰的（和最好的一张统计上分不出高下）保持快速估算的顺序排在前面；
+  // 被淘汰的（明显更差）按模拟平均分排到后面。这样只有快速估算的首选被证明更差时，推荐才会变
   const stats = mc?.stats;
+  const fastTop = options[0]?.kind;
   if (stats && Object.keys(stats).length) {
+    const order = new Map(options.map((o, i) => [o.kind, i]));
     options = options.map((o) => (stats[o.kind] ? { ...o, mc: stats[o.kind] } : o));
+    const rank = (o: ScDiscardOption) => (o.mc ? (o.mc.kept ? 0 : 1) : 2);
     options.sort((a, b) => {
-      if (a.mc && b.mc) return b.mc.mean - a.mc.mean;
-      if (a.mc) return -1;
-      if (b.mc) return 1;
-      return a.score - b.score;
+      const r = rank(a) - rank(b);
+      if (r) return r;
+      if (rank(a) === 1) return b.mc!.mean - a.mc!.mean;
+      return order.get(a.kind)! - order.get(b.kind)!;
     });
   }
   const best = options[0];
@@ -492,10 +500,20 @@ function coachDiscard(env: Env, mc?: ScCoachOptions['mc']): ScCoach {
           `按「${best.route}」做：还差 ${best.shanten} 张有用的牌就听牌，能进 ${best.ukeireKinds} 种、共 ${best.ukeire} 张；不做的话是${shantenName(c.plain.shanten)}、进 ${c.plain.ukeire} 张，快一点但胡了分数小`,
         );
     }
-    if (best.mc)
-      points.push(
-        `精算：模拟 ${best.mc.n} 局，平均 ${pts(best.mc.mean)} 分（±${pts(2 * best.mc.se)}），胡牌率约 ${pct(best.mc.pWin)}，放炮率约 ${pct(best.mc.pDealIn)}`,
+    if (best.mc) {
+      const dropped = fastTop !== undefined && fastTop !== best.kind;
+      const higher = options.find(
+        (o) => o.kind !== best.kind && o.mc?.kept && o.mc.mean > best.mc!.mean,
       );
+      points.push(
+        `精算：打 ${kindName(best.kind)} 后接着模拟 ${best.mc.n} 局（之后的牌按电脑的打法），平均得 ${pts(best.mc.mean)} 分（±${pts(2 * best.mc.se)}），${pct(best.mc.pWin)} 的局能胡（不论牌型），${pct(best.mc.pDealIn)} 的局点过炮` +
+          (dropped
+            ? `；快速估算原本推荐打 ${kindName(fastTop)}，模拟下来明显更差`
+            : higher
+              ? `；打 ${kindName(higher.kind)} 模拟平均 ${pts(higher.mc!.mean)} 分，差别在误差范围内`
+              : ''),
+      );
+    }
   }
 
   // 查大叫 / 查花猪
@@ -1057,11 +1075,13 @@ function judge(
   let reason: string;
   if (why === 'speed') {
     reason =
-      o.shanten > best.shanten
-        ? `打 ${name} 会退成${shantenName(o.shanten)}，比打 ${bn} 离胡牌多一步`
-        : o.ukeire < best.ukeire
-          ? `打 ${name} 也是${shantenName(o.shanten)}，但只能进 ${o.ukeire} 张，比打 ${bn} 少 ${best.ukeire - o.ukeire} 张`
-          : `打 ${name} 胡牌率约 ${pct(o.pWin)}，比打 ${bn}（${pct(best.pWin)}）低`;
+      o.shanten > best.shanten && o.route !== best.route && !(o.shanten === 0 || best.shanten === 0)
+        ? `打 ${name} 要走「${o.route}」，还差 ${o.shanten} 张才听牌，胡牌率约 ${pct(o.pWin)}，比打 ${bn}（${pct(best.pWin)}）低`
+        : o.shanten > best.shanten
+          ? `打 ${name} 会退成${shantenName(o.shanten)}，比打 ${bn} 离胡牌多一步`
+          : o.ukeire < best.ukeire
+            ? `打 ${name} 也是${shantenName(o.shanten)}，但只能进 ${o.ukeire} 张，比打 ${bn} 少 ${best.ukeire - o.ukeire} 张`
+            : `打 ${name} 胡牌率约 ${pct(o.pWin)}，比打 ${bn}（${pct(best.pWin)}）低`;
   } else if (why === 'size') {
     reason = `打 ${name} 走「${o.route}」，胡了平均 ${pts(o.value)} 分，打 ${bn} 走「${best.route}」有 ${pts(best.value)} 分`;
   } else if (why === 'safe') {

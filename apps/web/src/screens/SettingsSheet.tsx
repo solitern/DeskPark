@@ -306,6 +306,9 @@ export function SettingsSheet({
       <Field label="记牌器" hint="斗地主中显示剩余的牌">
         <Switch checked={s.cardCounter} onChange={(v) => settings.set({ cardCounter: v })} />
       </Field>
+      <Field label="导师精算" hint="四川麻将导师在后台模拟几百局，修正出牌建议；手机较慢时可以关">
+        <Switch checked={s.mjCoachMc} onChange={(v) => settings.set({ mjCoachMc: v })} />
+      </Field>
       <Field label="音效">
         <Switch checked={s.sound} onChange={(v) => settings.set({ sound: v })} />
       </Field>

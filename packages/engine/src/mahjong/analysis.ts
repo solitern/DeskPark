@@ -104,13 +104,15 @@ export function isWinningShape(counts: readonly number[], melds: number): boolea
 // 向听数
 
 type Partial = [mentsu: number, taatsu: number, pair: number];
-const suitCache = new Map<string, Partial[]>();
+// 按一门牌（9 种、每种 0–4 张）的计数缓存拆法；键用五进制数，比拼字符串快
+const suitCache = new Map<number, Partial[]>();
 
-function suitPartials(cs: number[]): Partial[] {
-  const key = cs.join('');
+function suitPartials(counts: readonly number[], off: number): Partial[] {
+  let key = 0;
+  for (let i = off + 8; i >= off; i--) key = key * 5 + counts[i];
   const hit = suitCache.get(key);
   if (hit) return hit;
-  const c = [...cs];
+  const c = counts.slice(off, off + 9);
   const found = new Map<string, Partial>();
   const rec = (i: number, m: number, t: number, p: number) => {
     while (i < 9 && c[i] === 0) i++;
@@ -182,7 +184,7 @@ function suitPartials(cs: number[]): Partial[] {
  * 没用上的牌不够时，每缺一个种子多要 1 张。满 13 / 14 张时这一项恒为 0，结果与常规公式相同。
  */
 export function shantenStandard(counts: readonly number[], melds: number): number {
-  const parts = [0, 1, 2].map((s) => suitPartials(counts.slice(s * 9, s * 9 + 9)));
+  const parts = [suitPartials(counts, 0), suitPartials(counts, 9), suitPartials(counts, 18)];
   const n = total(counts);
   let best = Infinity;
   for (const a of parts[0])

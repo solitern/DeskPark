@@ -38,6 +38,8 @@ export interface Settings {
   coach: boolean;
   /** 麻将导师面板：需要时打开，随时可以关 */
   mjCoach: boolean;
+  /** 麻将导师精算：后台模拟若干局修正出牌建议（低端手机可以关） */
+  mjCoachMc: boolean;
 }
 
 export const settings = createStore<Settings>('park.settings', {
@@ -49,6 +51,7 @@ export const settings = createStore<Settings>('park.settings', {
   figures: false,
   coach: false,
   mjCoach: false,
+  mjCoachMc: true,
 });
 
 const NAMES = [

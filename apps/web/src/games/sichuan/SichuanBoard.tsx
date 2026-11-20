@@ -11,6 +11,7 @@ import { signed } from '../../lib/format';
 import { playSound } from '../../lib/sound';
 import { settings } from '../../lib/store';
 import { useTurnCue } from '../shared/trick';
+import { cancelMahjongMc, mahjongMc } from '../../lib/coach/mahjong';
 import { MahjongCoach } from './coach';
 import './sichuan.css';
 
@@ -104,13 +105,50 @@ export default function SichuanBoard({ ctl }: { ctl: Ctl }) {
   const actRef = useRef<HTMLDivElement>(null);
 
   // 导师：需要时打开，随时可以关；只用自己看得到的信息
-  const { mjCoach } = settings.use();
+  const { mjCoach, mjCoachMc } = settings.use();
   const coachOpen = mjCoach && !spectator;
-  const coach = useMemo(
+  const fast = useMemo(
     () => (coachOpen ? sc.coachSichuan(v) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [ctl.version, coachOpen],
   );
+  // 精算：快速建议先出来，后台模拟算完再修正（前几名候选 + 玩家选中的牌）
+  const mcTiles = useMemo(() => {
+    if (!fast || !mjCoachMc || fast.stage !== 'discard' || fast.advice.action !== 'discard')
+      return null;
+    if (fast.options.length < 2 || fast.options[0].note === '缺门') return null;
+    const tiles = fast.options.slice(0, 4).map((o) => o.tile);
+    const picked = sel.length === 1 ? v.hand.find((t) => t.id === sel[0]) : undefined;
+    if (picked && !fast.options.slice(0, 4).some((o) => o.kind === mj.kindOf(picked))) {
+      const o = fast.options.find((x) => x.kind === mj.kindOf(picked));
+      if (o) tiles.push(o.tile);
+    }
+    return tiles;
+  }, [fast, mjCoachMc, sel, v.hand]);
+  const mcKey = mcTiles ? `${ctl.version}:${mcTiles.join(',')}` : null;
+  const [mc, setMc] = useState<{ key: string; stats: Record<number, sc.ScMcStat> } | null>(null);
+  useEffect(() => {
+    if (!mcKey || !mcTiles) {
+      cancelMahjongMc();
+      return;
+    }
+    let alive = true;
+    mahjongMc(v, mcTiles)
+      .then((stats) => alive && setMc({ key: mcKey, stats }))
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mcKey]);
+  useEffect(() => () => cancelMahjongMc(), []);
+  const mcStats = mc && mcKey && mc.key === mcKey ? mc.stats : null;
+  const coach = useMemo(
+    () => (fast && mcStats ? sc.coachSichuan(v, { mc: { stats: mcStats } }) : fast),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [fast, mcStats],
+  );
+  const mcBusy = !!mcKey && !mcStats;
   const judge = useMemo(() => (coach ? sc.coachSelected(v, coach, sel) : null), [coach, sel, v]);
   const coachTiles = new Set(
     coach && ['discard', 'exchange', 'gang'].includes(coach.advice.action ?? '')
@@ -372,6 +410,7 @@ export default function SichuanBoard({ ctl }: { ctl: Ctl }) {
           <MahjongCoach
             view={v}
             coach={coach}
+            mcBusy={mcBusy}
             judge={judge}
             selected={sel}
             onPick={(id) => {

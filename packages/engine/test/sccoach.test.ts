@@ -319,3 +319,112 @@ describe('麻将导师 v2：期望得分', () => {
     expect(seen).toBeGreaterThan(20);
   });
 });
+
+/** 打一盘电脑对局，收集「轮到某人出牌、没有抢牌窗口」的局面 */
+function discardViews(seed: number, every = 4): sc.ScView[] {
+  let st = sichuan.setup({
+    players: [0, 1, 2, 3].map((i) => ({ name: `p${i}`, isBot: true })),
+    options: sichuan.defaultOptions,
+    seed,
+  });
+  const rng = new Rng(seed);
+  const out: sc.ScView[] = [];
+  for (let i = 0; i < 600 && st.phase !== 'roundOver' && st.phase !== 'matchOver'; i++) {
+    const seat = sichuan.activeSeats(st)[0];
+    const v = sichuan.view(st, seat);
+    if (st.phase === 'play' && !v.window && v.legal?.discard.length && i % every === 0) out.push(v);
+    st = sichuan.apply(st, seat, sichuan.bot(v, seat, rng));
+  }
+  return out;
+}
+
+describe('麻将导师 v2：精算', () => {
+  it('原地推演与 apply 结果完全一致', () => {
+    for (const seed of [3, 4, 5]) {
+      let a = sichuan.setup({
+        players: [0, 1, 2, 3].map((i) => ({ name: `p${i}`, isBot: true })),
+        options: { ...sichuan.defaultOptions, rounds: 1 },
+        seed,
+      });
+      let b = JSON.parse(JSON.stringify(a)) as sc.ScState;
+      const ra = new Rng(seed);
+      const rb = new Rng(seed);
+      for (let i = 0; i < 600 && a.phase !== 'matchOver'; i++) {
+        const seat = sichuan.activeSeats(a)[0];
+        a = sichuan.apply(a, seat, sichuan.bot(sichuan.view(a, seat), seat, ra));
+        b = S.applyInPlace(b, seat, sichuan.bot(sichuan.view(b, seat), seat, rb));
+      }
+      expect(b).toEqual(a);
+    }
+  });
+
+  it('determinize：1000 次采样都满足牌墙长度、对手没有缺门、换出牌位置、牌总数 108', () => {
+    let n = 0;
+    for (let seed = 1; n < 1000 && seed < 60; seed++) {
+      for (const v of discardViews(seed, 9)) {
+        const me = v.seat!;
+        const shift = v.exchangeDir === 'next' ? 1 : v.exchangeDir === 'prev' ? 3 : 2;
+        const receiver = (me + shift) % 4;
+        const seen = new Set<number>();
+        for (const p of v.players) {
+          for (const r of p.river) seen.add(r.tile.id);
+          for (const m of p.melds) for (const t of m.tiles) seen.add(t.id);
+        }
+        const hiddenGiven = (v.exchange?.given ?? []).filter((t) => !seen.has(t.id));
+        for (let k = 0; k < 4 && n < 1000; k++, n++) {
+          const d = S.determinize(v, new Rng(seed * 100 + k));
+          const st = d.state;
+          expect(st.wall.length).toBe(v.wallCount);
+          const ids = S._tilesOf(st).map((t) => t.id);
+          expect(ids.length).toBe(108);
+          expect(new Set(ids).size).toBe(108);
+          expect(st.players[me].hand.map((t) => t.id).sort()).toEqual(
+            v.hand.map((t) => t.id).sort(),
+          );
+          for (const t of hiddenGiven)
+            expect(st.players[receiver].hand.some((x) => x.id === t.id)).toBe(true);
+          if (!d.relaxed)
+            for (let s = 0; s < 4; s++) {
+              const p = v.players[s];
+              const last = p.river.at(-1)?.tile;
+              if (s === me || p.won || !p.que || !last || last.suit === p.que) continue;
+              expect(st.players[s].hand.some((t) => t.suit === p.que)).toBe(false);
+            }
+          for (let s = 0; s < 4; s++)
+            if (!v.players[s].won) expect(st.players[s].hand.length).toBe(v.players[s].handCount);
+        }
+      }
+    }
+    expect(n).toBe(1000);
+  });
+
+  it('确定性：同一局面精算两次结果完全相同', () => {
+    const v = discardViews(7, 6)[6];
+    const fast = S.coachSichuan(v);
+    const tiles = fast.options.slice(0, 3).map((o) => o.tile);
+    const opts = { budgetMs: Infinity, maxPerCandidate: 32, batch: 16 };
+    const a = S.mcEvaluate(v, tiles, opts);
+    const b = S.mcEvaluate(v, tiles, opts);
+    expect(b).toEqual(a);
+    expect(Object.keys(a).length).toBeGreaterThan(0);
+    const withMc = S.coachSichuan(v, { mc: { stats: a } });
+    expect(withMc.mode).toBe('mc');
+    expect(S.coachSichuan(v, { mc: { stats: a } })).toEqual(withMc);
+  });
+
+  it('性能：随机 200 个局面，快速模式 p95 < 30 ms（CI 放宽到 100 ms）', () => {
+    const views: sc.ScView[] = [];
+    for (let seed = 200; views.length < 200; seed++) views.push(...discardViews(seed, 5));
+    const times: number[] = [];
+    // 先热身，免得把第一次编译算进去
+    for (const v of views.slice(0, 10)) S.coachSichuan(v);
+    for (const v of views.slice(0, 200)) {
+      const t0 = performance.now();
+      S.coachSichuan(v);
+      times.push(performance.now() - t0);
+    }
+    times.sort((a, b) => a - b);
+    const p95 = times[Math.floor(times.length * 0.95)];
+    expect(p95).toBeLessThan(process.env.CI ? 100 : 30);
+  });
+});

@@ -21,6 +21,7 @@ import { FAN_CAP, evaluateHand, scoreOf, scoreWin } from './scoring';
 
 export * from './scoring';
 export * from './coach';
+export * from './coach/mc';
 
 /**
  * 四川麻将 · 成都血战到底（规则版本 chengdu-xz-1）。
@@ -821,6 +822,167 @@ function cleanAction(a: ScAction): ScAction {
   }
 }
 
+/**
+ * 在原状态上执行动作，会修改 state。只给导师精算的模拟推演用（省去每步深拷贝）；
+ * 正式对局用 sichuan.apply（不改入参），两者结果完全相同。
+ */
+export function applyInPlace(state: ScState, seat: Seat, raw: ScAction): ScState {
+  // 只保留各动作需要的字段：决定会存进状态，不能带上客户端附加的任意数据
+  const action = cleanAction(raw);
+  const p = state.players[seat];
+  switch (action.type) {
+    case 'ready': {
+      state.ready[seat] = true;
+      if (state.ready.every(Boolean)) {
+        state.dealer = state.result!.nextDealer;
+        state.round++;
+        deal(state);
+      }
+      return state;
+    }
+    case 'exchange': {
+      state.window!.decisions[seat] = action;
+      if (windowDone(state.window!)) {
+        const shift = state.exchangeDir === 'next' ? 1 : state.exchangeDir === 'prev' ? 3 : 2;
+        const given = state.players.map((pl, s) => {
+          const ids = new Set((state.window!.decisions[s] as { tiles: number[] }).tiles);
+          const out = pl.hand.filter((t) => ids.has(t.id));
+          pl.hand = pl.hand.filter((t) => !ids.has(t.id));
+          return out;
+        });
+        state.exchanged = [0, 1, 2, 3].map((s) => ({
+          given: given[s],
+          received: given[(s + N - shift) % N],
+        }));
+        for (let s = 0; s < N; s++) state.players[(s + shift) % N].hand.push(...given[s]);
+        pushEvent(state, { type: 'exchange', dir: state.exchangeDir! });
+        state.phase = 'dingque';
+        state.window = newWindow('dingque', [0, 1, 2, 3]);
+      }
+      return state;
+    }
+    case 'que': {
+      state.window!.decisions[seat] = action;
+      if (windowDone(state.window!)) {
+        state.players.forEach((pl, s) => {
+          pl.que = (state.window!.decisions[s] as { suit: MjSuit }).suit;
+        });
+        pushEvent(state, { type: 'que' });
+        state.phase = 'play';
+        state.window = null;
+        state.turn = state.dealer;
+        state.drawnThisTurn = null;
+        state.canSelfHu = true;
+        state.mustHuSelf = false;
+      }
+      return state;
+    }
+    case 'discard': {
+      const tile = p.hand.find((t) => t.id === action.tile)!;
+      p.hand = p.hand.filter((t) => t.id !== tile.id);
+      p.river.push({ tile });
+      state.lastDiscard = { seat, id: tile.id };
+      state.discards++;
+      state.drawnThisTurn = null;
+      state.dihuChance = false;
+      openClaims(state, seat, tile);
+      return state;
+    }
+    case 'hu': {
+      if (state.window) {
+        state.window.decisions[seat] = action;
+        if (windowDone(state.window)) resolveWindow(state);
+        return state;
+      }
+      // 自摸
+      const value = winValue(state, p, null)!;
+      const tianhu =
+        seat === state.dealer &&
+        state.discards === 0 &&
+        state.claimsOrKongs === 0 &&
+        state.drawnThisTurn === null;
+      const ctx = {
+        selfDrawn: true,
+        afterKong: p.afterKong,
+        robbing: false,
+        haidi: state.drawnThisTurn !== null && state.wall.length === 0,
+        tianhu,
+        dihu: state.dihuChance,
+      };
+      const score = scoreWin(value, ctx, state.options.baseScore);
+      const tile = p.hand.find((t) => t.id === state.drawnThisTurn) ?? p.hand[p.hand.length - 1];
+      const group = ++state.groups;
+      p.won = { seat, group, selfDrawn: true, tile, from: null, score };
+      for (const s of others(seat)) {
+        if (!state.players[s].won) addLedger(state, s, seat, score.points, 'pay.zimo');
+      }
+      pushEvent(state, { type: 'zimo', seat });
+      recordWinGroup(state, [seat], null);
+      p.afterKong = false;
+      p.lastReceipt = null;
+      if (!finishIfThree(state)) draw(state, nextActive(state, seat), false);
+      return state;
+    }
+    case 'gang': {
+      if (state.window) {
+        state.window.decisions[seat] = action;
+        if (windowDone(state.window)) resolveWindow(state);
+        return state;
+      }
+      const target = p.hand.find((t) => t.id === action.tile)!;
+      const kind = kindOf(target);
+      const pung = p.melds.find((m) => m.type === 'pung' && m.kind === kind);
+      if (pung) {
+        // 巴杠：先开抢杠窗口
+        const timely = state.drawnThisTurn === target.id;
+        p.hand = p.hand.filter((t) => t.id !== target.id);
+        state.drawnThisTurn = null;
+        const w = newWindow('rob', []);
+        w.source = seat;
+        w.tile = target;
+        w.timely = timely;
+        const must = state.wall.length <= 4;
+        let any = false;
+        for (const s of others(seat)) {
+          const o = state.players[s];
+          if (o.won) continue;
+          w.required[s] = true;
+          const can = !hasQue(o) && target.suit !== o.que && !!winValue(state, o, target);
+          if (can && must) {
+            w.mustHu[s] = true;
+            w.options[s] = ['hu'];
+            any = true;
+          } else if (can && !o.passHu) {
+            w.options[s] = ['hu', 'pass'];
+            any = true;
+          } else {
+            w.options[s] = ['pass'];
+            w.decisions[s] = { type: 'pass' };
+          }
+        }
+        if (any) state.window = w;
+        else completeBa(state, seat, target, timely);
+        return state;
+      }
+      // 暗杠
+      const four = p.hand.filter((t) => kindOf(t) === kind);
+      p.hand = p.hand.filter((t) => kindOf(t) !== kind);
+      p.melds.push({ type: 'kong', kongType: 'an', kind, tiles: four, from: null });
+      state.drawnThisTurn = null;
+      payKong(state, seat, 'an', null, false);
+      draw(state, seat, true);
+      return state;
+    }
+    case 'peng':
+    case 'pass': {
+      state.window!.decisions[seat] = action;
+      if (windowDone(state.window!)) resolveWindow(state);
+      return state;
+    }
+  }
+  return state;
+}
+
 export const sichuan: GameDefinition<ScState, ScAction, ScView, ScOptions> = {
   meta: {
     id: 'sichuan',
@@ -972,163 +1134,7 @@ export const sichuan: GameDefinition<ScState, ScAction, ScView, ScOptions> = {
     }
   },
 
-  apply(prev, seat, raw) {
-    // 只保留各动作需要的字段：决定会存进状态，不能带上客户端附加的任意数据
-    const action = cleanAction(raw);
-    const state = clone(prev);
-    const p = state.players[seat];
-    switch (action.type) {
-      case 'ready': {
-        state.ready[seat] = true;
-        if (state.ready.every(Boolean)) {
-          state.dealer = state.result!.nextDealer;
-          state.round++;
-          deal(state);
-        }
-        return state;
-      }
-      case 'exchange': {
-        state.window!.decisions[seat] = action;
-        if (windowDone(state.window!)) {
-          const shift = state.exchangeDir === 'next' ? 1 : state.exchangeDir === 'prev' ? 3 : 2;
-          const given = state.players.map((pl, s) => {
-            const ids = new Set((state.window!.decisions[s] as { tiles: number[] }).tiles);
-            const out = pl.hand.filter((t) => ids.has(t.id));
-            pl.hand = pl.hand.filter((t) => !ids.has(t.id));
-            return out;
-          });
-          state.exchanged = [0, 1, 2, 3].map((s) => ({
-            given: given[s],
-            received: given[(s + N - shift) % N],
-          }));
-          for (let s = 0; s < N; s++) state.players[(s + shift) % N].hand.push(...given[s]);
-          pushEvent(state, { type: 'exchange', dir: state.exchangeDir! });
-          state.phase = 'dingque';
-          state.window = newWindow('dingque', [0, 1, 2, 3]);
-        }
-        return state;
-      }
-      case 'que': {
-        state.window!.decisions[seat] = action;
-        if (windowDone(state.window!)) {
-          state.players.forEach((pl, s) => {
-            pl.que = (state.window!.decisions[s] as { suit: MjSuit }).suit;
-          });
-          pushEvent(state, { type: 'que' });
-          state.phase = 'play';
-          state.window = null;
-          state.turn = state.dealer;
-          state.drawnThisTurn = null;
-          state.canSelfHu = true;
-          state.mustHuSelf = false;
-        }
-        return state;
-      }
-      case 'discard': {
-        const tile = p.hand.find((t) => t.id === action.tile)!;
-        p.hand = p.hand.filter((t) => t.id !== tile.id);
-        p.river.push({ tile });
-        state.lastDiscard = { seat, id: tile.id };
-        state.discards++;
-        state.drawnThisTurn = null;
-        state.dihuChance = false;
-        openClaims(state, seat, tile);
-        return state;
-      }
-      case 'hu': {
-        if (state.window) {
-          state.window.decisions[seat] = action;
-          if (windowDone(state.window)) resolveWindow(state);
-          return state;
-        }
-        // 自摸
-        const value = winValue(state, p, null)!;
-        const tianhu =
-          seat === state.dealer &&
-          state.discards === 0 &&
-          state.claimsOrKongs === 0 &&
-          state.drawnThisTurn === null;
-        const ctx = {
-          selfDrawn: true,
-          afterKong: p.afterKong,
-          robbing: false,
-          haidi: state.drawnThisTurn !== null && state.wall.length === 0,
-          tianhu,
-          dihu: state.dihuChance,
-        };
-        const score = scoreWin(value, ctx, state.options.baseScore);
-        const tile = p.hand.find((t) => t.id === state.drawnThisTurn) ?? p.hand[p.hand.length - 1];
-        const group = ++state.groups;
-        p.won = { seat, group, selfDrawn: true, tile, from: null, score };
-        for (const s of others(seat)) {
-          if (!state.players[s].won) addLedger(state, s, seat, score.points, 'pay.zimo');
-        }
-        pushEvent(state, { type: 'zimo', seat });
-        recordWinGroup(state, [seat], null);
-        p.afterKong = false;
-        p.lastReceipt = null;
-        if (!finishIfThree(state)) draw(state, nextActive(state, seat), false);
-        return state;
-      }
-      case 'gang': {
-        if (state.window) {
-          state.window.decisions[seat] = action;
-          if (windowDone(state.window)) resolveWindow(state);
-          return state;
-        }
-        const target = p.hand.find((t) => t.id === action.tile)!;
-        const kind = kindOf(target);
-        const pung = p.melds.find((m) => m.type === 'pung' && m.kind === kind);
-        if (pung) {
-          // 巴杠：先开抢杠窗口
-          const timely = state.drawnThisTurn === target.id;
-          p.hand = p.hand.filter((t) => t.id !== target.id);
-          state.drawnThisTurn = null;
-          const w = newWindow('rob', []);
-          w.source = seat;
-          w.tile = target;
-          w.timely = timely;
-          const must = state.wall.length <= 4;
-          let any = false;
-          for (const s of others(seat)) {
-            const o = state.players[s];
-            if (o.won) continue;
-            w.required[s] = true;
-            const can = !hasQue(o) && target.suit !== o.que && !!winValue(state, o, target);
-            if (can && must) {
-              w.mustHu[s] = true;
-              w.options[s] = ['hu'];
-              any = true;
-            } else if (can && !o.passHu) {
-              w.options[s] = ['hu', 'pass'];
-              any = true;
-            } else {
-              w.options[s] = ['pass'];
-              w.decisions[s] = { type: 'pass' };
-            }
-          }
-          if (any) state.window = w;
-          else completeBa(state, seat, target, timely);
-          return state;
-        }
-        // 暗杠
-        const four = p.hand.filter((t) => kindOf(t) === kind);
-        p.hand = p.hand.filter((t) => kindOf(t) !== kind);
-        p.melds.push({ type: 'kong', kongType: 'an', kind, tiles: four, from: null });
-        state.drawnThisTurn = null;
-        payKong(state, seat, 'an', null, false);
-        draw(state, seat, true);
-        return state;
-      }
-      case 'peng':
-      case 'pass': {
-        state.window!.decisions[seat] = action;
-        if (windowDone(state.window!)) resolveWindow(state);
-        return state;
-      }
-    }
-    return state;
-  },
+  apply: (prev, seat, raw) => applyInPlace(clone(prev), seat, raw),
 
   view(state, seat) {
     const over = state.phase === 'roundOver' || state.phase === 'matchOver';
