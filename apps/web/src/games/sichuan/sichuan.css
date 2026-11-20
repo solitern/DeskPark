@@ -621,6 +621,13 @@
 .sc-coach__opt > span {
   flex: 1;
   min-width: 0;
+  line-height: 1.35;
+}
+.sc-coach__opt > span small {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 400;
+  color: var(--ink-3);
 }
 .sc-coach__opt.is-rec {
   color: var(--ink);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { mj, sc } from '../src';
-import { mj as M, sc as S } from '../src';
+import { Rng, mj as M, sc as S, sichuan } from '../src';
 
 /** 「123m456m789s」→ 牌（m 万、s 条、p 筒），同种牌自动用不同的副本 id */
 function tiles(spec: string, used = new Map<number, number>()): mj.Tile[] {
@@ -82,6 +82,8 @@ function view(o: Opts): sc.ScView {
     scores: [0, 0, 0, 0],
     roundDeltas: [0, 0, 0, 0],
     visible,
+    myKongIncome: 0,
+    myAfterKong: null,
     events: [],
     result: null,
     ready: [false, false, false, false],
@@ -125,7 +127,9 @@ describe('麻将导师：出牌', () => {
     const c = S.coachSichuan(v);
     const bad = v.hand.find((t) => M.tileName(t) === '5万')!;
     const j = S.coachSelected(v, c, [bad.id]);
-    expect(j?.tone).toBe('bad');
+    // v2 按期望差分档：推荐的 1 条约 1.72 分，5 万约 1.34 分，只差 0.38 底，属于 good；
+    // 文案仍要指出「退成一向听」。（2026-11-20 经确认，原为 bad）
+    expect(j?.tone).toBe('good');
     expect(j?.text).toContain('退成');
     const good = S.coachSelected(v, c, [c.advice.tiles[0]]);
     expect(good?.tone).toBe('best');
@@ -149,14 +153,17 @@ describe('麻将导师：出牌', () => {
 });
 
 describe('麻将导师：碰杠胡', () => {
-  it('能胡就建议胡，并算出番数', () => {
+  it('能胡时算出番数；前期宽叫的清一色等自摸期望更高，建议过', () => {
     const v = view({
       hand: '123m456m789m22m57m',
       que: 'tong',
       window: { tile: '6m', from: 2, hu: true },
     });
     const c = S.coachSichuan(v);
-    expect(c.advice.action).toBe('hu');
+    // v2：胡 = 4 分；过 ≈ 7.0 分（过水后胡牌率约 89%，按自摸 ×3 家加权平均 7.9 分，
+    // 这个局面里对手还没出牌、几乎没有威胁），高出余量 max(1 底, 20%)，所以建议过。
+    // （2026-11-20 经确认，原为 hu）
+    expect(c.advice.action).toBe('pass');
     expect(c.points[0]).toMatch(/清一色.*3 番/);
   });
 
@@ -196,5 +203,119 @@ describe('麻将导师：换三张、定缺', () => {
     v.legal = { ...v.legal, exchange: false, que: true };
     const q = S.coachSichuan(v);
     expect(q.advice.suit).toBe('tiao');
+  });
+});
+
+describe('麻将导师 v2：期望得分', () => {
+  it('tingOfView 与 tingOf 对同一手牌结果一致（随机 1000 手）', () => {
+    let checked = 0;
+    for (let seed = 1; checked < 1000 && seed < 400; seed++) {
+      let st = sichuan.setup({
+        players: [0, 1, 2, 3].map((i) => ({ name: `p${i}`, isBot: true })),
+        options: sichuan.defaultOptions,
+        seed,
+      });
+      const rng = new Rng(seed);
+      for (let i = 0; i < 400 && st.phase !== 'roundOver' && st.phase !== 'matchOver'; i++) {
+        if (st.phase === 'play' && i % 3 === 0)
+          for (const seat of [0, 1, 2, 3]) {
+            const p = st.players[seat];
+            if (p.won) continue;
+            const v = sichuan.view(st, seat);
+            const a = S.tingOf(st, seat);
+            const b = S.tingOfView(p.hand, p.melds, p.que, v.visible, st.options);
+            expect(b ? { kind: b.kind, points: b.points } : null).toEqual(
+              a ? { kind: a.kind, points: a.points } : null,
+            );
+            checked++;
+          }
+        const act = sichuan.activeSeats(st);
+        if (!act.length) break;
+        const seat = act[0];
+        st = sichuan.apply(st, seat, sichuan.bot(sichuan.view(st, seat), seat, rng));
+      }
+    }
+    expect(checked).toBeGreaterThanOrEqual(1000);
+  });
+
+  it('清一色 vs 平胡：牌墙多时做清一色，牌墙 ≤ 12 时走进张多的平胡', () => {
+    const hand = '112356666789m34s';
+    const many = S.coachSichuan(view({ hand, wall: 52 }));
+    const few = S.coachSichuan(view({ hand, wall: 10 }));
+    const v = view({ hand });
+    expect(name(v, many.advice.tiles[0])).toBe('3条');
+    expect(many.options[0].route).toMatch(/^清一色·万/);
+    expect(many.options[0].shanten).toBe(1);
+    expect(name(v, few.advice.tiles[0])).toBe('1万');
+    expect(few.options[0].route).toBe('平胡');
+    const flushInFew = few.options.find((o) => o.kind === many.options[0].kind)!;
+    expect(few.options[0].ukeire).toBeGreaterThan(flushInFew.ukeire);
+  });
+
+  it('听牌选择：听 3 张的清一色比听 8 张的平胡值钱（牌墙还多时）', () => {
+    // 同一桌面（看得见的牌由这手 14 张决定）：5 万已见一张，3 条、6 条都没见过
+    const v = view({ hand: '111m123m789m99m46m5m', wall: 52 });
+    const flush = S.coachEvalHand(v, tiles('123m456m789m22m46m'));
+    const wide = S.coachEvalHand(v, tiles('123m789m22m456s45s'));
+    expect(flush.shanten).toBe(0);
+    expect(wide.shanten).toBe(0);
+    expect(flush.ukeire).toBe(3);
+    expect(wide.ukeire).toBe(8);
+    expect(flush.route).toContain('清一色');
+    expect(flush.ev).toBeGreaterThan(wide.ev);
+  });
+
+  it('巴杠：第四张不是这回合刚摸的，不收钱，文案也不说每家付', () => {
+    // 已碰 5 万（副本 1–3），手里还有第 4 张（副本 0）
+    const v = view({ hand: '123m789m22s456s5m79s' });
+    const pung = [1, 2, 3].map((c) => M.tileOf(4 * 4 + c));
+    v.players[0].melds = [{ type: 'pung', kind: 4, tiles: pung, from: 1 }];
+    for (const t of pung) v.visible[M.kindOf(t)]++;
+    const fourth = v.hand.find((t) => M.kindOf(t) === 4)!;
+    v.legal!.gang = [{ tile: fourth.id, type: 'ba' }];
+    const stale = S.coachKong(v, fourth.id);
+    expect(stale.income).toBe(0);
+    expect(stale.text).not.toContain('每家付');
+    // 刚摸到的才是及时雨：每个还没胡的对手付 1 分
+    v.drawn = fourth.id;
+    const timely = S.coachKong(v, fourth.id);
+    expect(timely.income).toBe(3);
+    expect(timely.text).toContain('每家付你 1 分');
+  });
+
+  it('防守：下家疑似清一色万且多半听牌、我还两向听时，弃和并且不打万子', () => {
+    const v = view({
+      hand: '1379m12478s299s',
+      opps: [
+        { que: 'tong', river: '1123s3678s99p55p', melds: ['555m', '888m'] },
+        { que: 'tiao' },
+        { que: 'wan' },
+      ],
+      wall: 20,
+    });
+    const c = S.coachSichuan(v);
+    expect(c.options[0].shanten).toBeGreaterThanOrEqual(2);
+    expect(c.defense).toBe(true);
+    expect(M.tileOf(c.advice.tiles[0]).suit).not.toBe('wan');
+  });
+
+  it('确定性：同一局面调用两次结果完全相同', () => {
+    let st = sichuan.setup({
+      players: [0, 1, 2, 3].map((i) => ({ name: `p${i}`, isBot: true })),
+      options: sichuan.defaultOptions,
+      seed: 11,
+    });
+    const rng = new Rng(11);
+    let seen = 0;
+    for (let i = 0; i < 300 && st.phase !== 'roundOver' && st.phase !== 'matchOver'; i++) {
+      const seat = sichuan.activeSeats(st)[0];
+      const v = sichuan.view(st, seat);
+      if (v.legal) {
+        expect(S.coachSichuan(v)).toEqual(S.coachSichuan(v));
+        seen++;
+      }
+      st = sichuan.apply(st, seat, sichuan.bot(v, seat, rng));
+    }
+    expect(seen).toBeGreaterThan(20);
   });
 });

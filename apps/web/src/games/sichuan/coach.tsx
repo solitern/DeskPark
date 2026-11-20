@@ -34,10 +34,18 @@ function optionText(o: SC.ScDiscardOption): string {
   if (o.note === '缺门') return '缺门，先打掉';
   if (o.shanten === 0 && o.waits.length) {
     const live = o.waits.reduce((a, w) => a + w.left, 0);
-    const fan = Math.max(...o.waits.map((w) => w.fan));
-    return `听 ${o.waits.map((w) => mj.kindName(w.kind)).join(' ')} · 剩 ${live} 张 · ${fan} 番`;
+    return `听 ${o.waits.map((w) => mj.kindName(w.kind)).join(' ')} · 剩 ${live} 张`;
   }
-  return `${sc.shantenName(o.shanten)} · 进 ${o.ukeireKinds} 种 ${o.ukeire} 张`;
+  return `${o.note ? `${o.note} ` : ''}${sc.shantenName(o.shanten)} · 进 ${o.ukeire} 张`;
+}
+
+/** 第二行：胡牌率、胡了平均多少分（精算后加上模拟平均分） */
+function optionSub(o: SC.ScDiscardOption): string {
+  if (o.note === '缺门') return `放炮风险约 ${o.risk.toFixed(1)} 分`;
+  const parts = [`胡牌率 ${Math.round(o.pWin * 100)}%`, `胡了约 ${o.value.toFixed(1)} 分`];
+  if (o.fold) parts.unshift('先保守');
+  if (o.mc) parts.push(`精算 ${o.mc.mean >= 0 ? '+' : ''}${o.mc.mean.toFixed(1)} 分`);
+  return parts.join(' · ');
 }
 
 export function MahjongCoach({
@@ -198,7 +206,10 @@ export function MahjongCoach({
                         title="点一下选中这张牌"
                       >
                         <MahjongTile tile={kindTile(o.kind)} w="20px" />
-                        <span>{optionText(o)}</span>
+                        <span>
+                          {optionText(o)}
+                          <small>{optionSub(o)}</small>
+                        </span>
                         {coach.showDanger && o.note !== '缺门' && (
                           <em className={`sc-coach__danger is-${o.danger}`}>
                             {sc.DANGER_NAME[o.danger]}

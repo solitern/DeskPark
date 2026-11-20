@@ -250,6 +250,10 @@ export interface ScView {
   roundDeltas: number[];
   /** 从本座位视角已可见的每种牌张数（用于剩余张数、死叫判断） */
   visible: number[];
+  /** 自己本盘收到、还没被转走的杠钱（流局没听牌时要退税）；只给自己看，其他人为 0 */
+  myKongIncome: number;
+  /** 自己刚杠完：下一张打出被胡就是杠上炮，这次杠收的钱会转给胡家（呼叫转移）。值为会被转走的钱，不在杠后为 null */
+  myAfterKong: number | null;
   events: ScEvent[];
   result: ScRoundResult | null;
   ready: boolean[];
@@ -1163,6 +1167,18 @@ export const sichuan: GameDefinition<ScState, ScAction, ScView, ScOptions> = {
       scores: state.scores,
       roundDeltas: deltasOf(state.ledger),
       visible: visibleCounts(state, seat),
+      myKongIncome:
+        seat === null
+          ? 0
+          : state.receipts
+              .filter((r) => r.seat === seat && r.transferred === 0)
+              .reduce((a, r) => a + r.gross, 0),
+      myAfterKong:
+        me && me.afterKong
+          ? me.lastReceipt !== null
+            ? state.receipts[me.lastReceipt].gross
+            : 0
+          : null,
       events: state.events,
       result: state.result,
       ready: state.ready,

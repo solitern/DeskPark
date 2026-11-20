@@ -174,26 +174,42 @@ function suitPartials(cs: number[]): Partial[] {
   return front;
 }
 
-/** 标准型向听数（-1 表示已和牌） */
+/**
+ * 标准型向听数（-1 表示已和牌）。
+ *
+ * 张数可以不足 13 − 3m（例如只保留一门的清一色计数、或去掉缺门后的手牌）：
+ * 缺的面子、将要从「没用上的牌」长出来（单张变面子要 2 张、变将要 1 张）；
+ * 没用上的牌不够时，每缺一个种子多要 1 张。满 13 / 14 张时这一项恒为 0，结果与常规公式相同。
+ */
 export function shantenStandard(counts: readonly number[], melds: number): number {
   const parts = [0, 1, 2].map((s) => suitPartials(counts.slice(s * 9, s * 9 + 9)));
-  let best = 8;
+  const n = total(counts);
+  let best = Infinity;
   for (const a of parts[0])
     for (const b of parts[1])
       for (const d of parts[2]) {
-        const m = melds + a[0] + b[0] + d[0];
+        const sets = a[0] + b[0] + d[0];
+        const m = melds + sets;
         const t = Math.min(a[1] + b[1] + d[1], Math.max(0, 4 - m));
         const p = a[2] + b[2] + d[2] > 0 ? 1 : 0;
-        const s = 8 - 2 * m - t - p;
+        const free = n - 3 * sets - 2 * t - 2 * p;
+        const seeds = Math.max(0, 4 - m - t) + (1 - p);
+        const s = 8 - 2 * m - t - p + Math.max(0, seeds - free);
         if (s < best) best = s;
       }
   return best;
 }
 
+/** 七对向听：缺的对子要从单张长出来，单张不够时每缺一张多要 1 张（四张相同算两对） */
 export function shantenSevenPairs(counts: readonly number[]): number {
   let pairs = 0;
-  for (const n of counts) pairs += Math.floor(n / 2);
-  return 6 - Math.min(7, pairs);
+  let singles = 0;
+  for (const n of counts) {
+    pairs += n >> 1;
+    singles += n & 1;
+  }
+  pairs = Math.min(7, pairs);
+  return 6 - pairs + Math.max(0, 7 - pairs - singles);
 }
 
 export function shanten(counts: readonly number[], melds: number): number {
