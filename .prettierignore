@@ -3,3 +3,5 @@ dist
 coverage
 package-lock.json
 apps/web/public/engines
+packages/engine/test/fixtures
+packages/engine/src/games/sichuan/coach/oppnet-weights.ts

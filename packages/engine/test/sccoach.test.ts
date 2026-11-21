@@ -428,3 +428,40 @@ describe('麻将导师 v2：精算', () => {
     expect(p95).toBeLessThan(process.env.CI ? 100 : 30);
   });
 });
+
+describe('麻将导师：对手模型（神经网络）', () => {
+  it('TypeScript 推理与 PyTorch 导出时的结果一致', async () => {
+    const { predictOpp, oppNetAvailable } = await import('../src/games/sichuan/coach/oppnet');
+    const check = (await import('./fixtures/oppnet-check.json')).default as {
+      x: number[][];
+      win: number[][];
+      tenpai: number[];
+      fan: number[][];
+    };
+    expect(oppNetAvailable()).toBe(true);
+    check.x.forEach((x, i) => {
+      const p = predictOpp(Float32Array.from(x));
+      p.win.forEach((w, k) => expect(w).toBeCloseTo(check.win[i][k], 4));
+      expect(p.tenpai).toBeCloseTo(check.tenpai[i], 4);
+      p.fan.forEach((f, j) => expect(f).toBeCloseTo(check.fan[i][j], 4));
+    });
+  });
+
+  it('导师默认用模型估计对手，缺门的牌对他仍然是 0', () => {
+    const v = view({
+      hand: '123m456m57m789s22s1s',
+      opps: [
+        { que: 'tiao', river: '1199p2288p55p' },
+        { que: 'tiao', river: '3377p4466p55p' },
+        { que: 'tiao', river: '88m99m1199p66p' },
+      ],
+    });
+    const c = S.coachSichuan(v);
+    const h = S.coachSichuan(v, { params: { opponentModel: 'heuristic' } });
+    // 模型与经验公式给出的风险不同，说明确实换成了模型
+    expect(c.options.map((o) => o.risk)).not.toEqual(h.options.map((o) => o.risk));
+    expect(c.options.filter((o) => M.kindSuit(o.kind) === 'tiao').every((o) => o.risk === 0)).toBe(
+      true,
+    );
+  });
+});

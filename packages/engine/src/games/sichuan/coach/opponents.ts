@@ -2,6 +2,8 @@ import type { MjSuit, Tile } from '../../../mahjong/tiles';
 import { KINDS, MJ_SUITS, kindOf, kindRank, kindSuit } from '../../../mahjong/tiles';
 import type { ScMeld, ScView } from '../index';
 import { FAN_CAP, scoreOf } from '../scoring';
+import { canonicalSuits, oppFeatures, toCanon } from './oppfeatures';
+import { oppNetAvailable, predictOpp } from './oppnet';
 import type { ScCoachParams } from './params';
 
 /**
@@ -30,6 +32,8 @@ export interface Opp {
   ptsPlain: number;
   /** 每种牌被他等着的概率（已归一化） */
   wait: number[];
+  /** 学习到的对手模型：打出每种牌时他能胡的概率、胡了收的分（没有模型时为 null，用 ready × wait 与 pts） */
+  net: { win: number[]; pts: number[] } | null;
   turns: number;
   melds: ScMeld[];
   river: Tile[];
@@ -95,7 +99,7 @@ export function opponentsOf(v: ScView, me: number, params: ScCoachParams): Opp[]
     }
     const sum = w.reduce((a, b) => a + b, 0);
     const wait = w.map((x) => (sum > 0 ? Math.min(1, (params.waitKinds * x) / sum) : 0));
-    out.push({
+    const opp: Opp = {
       seat: s,
       pos: POS[d],
       que: p.que,
@@ -107,12 +111,46 @@ export function opponentsOf(v: ScView, me: number, params: ScCoachParams): Opp[]
       pts,
       ptsPlain,
       wait,
+      net: null,
       turns,
       melds: p.melds,
       river,
-    });
+    };
+    if (params.opponentModel === 'net') applyNet(opp, v, base);
+    out.push(opp);
   }
   return out;
+}
+
+/**
+ * 用学习到的对手模型（ml/sc-opponent）替换经验估计：听牌概率、打出每种牌能胡的概率、胡了的分数。
+ * 模型直接估计真实番数（含根），所以不再乘 λ。清一色嫌疑等仍保留，用于讲解文案。
+ */
+function applyNet(o: Opp, v: ScView, base: number): void {
+  if (!oppNetAvailable()) return;
+  const f = oppFeatures(v, o.seat);
+  if (!f) return;
+  const pred = predictOpp(f);
+  const order = canonicalSuits(o.que!);
+  const C = pred.fanClasses;
+  const win = new Array<number>(KINDS).fill(0);
+  const ptsOn = new Array<number>(KINDS).fill(0);
+  let wsum = 0;
+  let psum = 0;
+  for (let k = 0; k < KINDS; k++) {
+    if (kindSuit(k) === o.que) continue;
+    const ck = toCanon(k, order);
+    win[k] = pred.win[ck];
+    let e = 0;
+    for (let c = 0; c < C; c++) e += pred.fan[ck * C + c] * scoreOf(c + 1, base);
+    ptsOn[k] = e;
+    wsum += win[k];
+    psum += win[k] * e;
+  }
+  o.net = { win, pts: ptsOn };
+  o.ready = pred.tenpai;
+  // 他胡牌时平均收的分：按能胡的牌加权
+  if (wsum > 0) o.pts = o.ptsPlain = psum / wsum;
 }
 
 /** 打出 k 时，这个对手胡了收多少分（k 在他的清一色嫌疑门里按清一色算；自己刚杠完要加杠上炮和呼叫转移） */
@@ -123,6 +161,11 @@ export function ptsFor(
   params: ScCoachParams,
   afterKong: number | null,
 ): number {
+  if (o.net) {
+    const p = o.net.pts[k];
+    // 杠上炮多 1 番（分数翻倍，封顶），还要把这次杠的钱转给他
+    return afterKong === null ? p : Math.min(2 * p, scoreOf(FAN_CAP, base)) + afterKong;
+  }
   const fan = o.flush && kindSuit(k) === o.flush ? o.fan : o.fanPlain;
   if (afterKong === null) return o.flush && kindSuit(k) === o.flush ? o.pts : o.ptsPlain;
   return scoreOf(Math.min(FAN_CAP, fan + 1), base) * params.lambda + afterKong;
@@ -134,15 +177,20 @@ export function riskTable(
   base: number,
   params: ScCoachParams,
   afterKong: number | null,
+  T = 0,
+  rz = 0,
 ): { risk: number[]; dealIn: number[] } {
   const risk = new Array<number>(KINDS).fill(0);
   const dealIn = new Array<number>(KINDS).fill(0);
+  // 血战里，听牌的对手就算这张不胡，之后也常会自摸，那时自己照样要付一份：
+  // 点炮真正多付的只是「他本来不会自摸到」的那部分
+  const carry = params.marginalDealIn ? 1 - rz * (1 - Math.pow(1 - params.huRate, T)) : 1;
   for (let k = 0; k < KINDS; k++)
     for (const o of opps) {
-      const p = o.ready * o.wait[k];
+      const p = o.net ? o.net.win[k] : o.ready * o.wait[k];
       if (p <= 0) continue;
       dealIn[k] += p;
-      risk[k] += p * ptsFor(o, k, base, params, afterKong);
+      risk[k] += p * ptsFor(o, k, base, params, afterKong) * carry;
     }
   return { risk, dealIn };
 }

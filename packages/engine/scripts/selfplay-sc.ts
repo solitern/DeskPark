@@ -176,9 +176,13 @@ async function main() {
   if (custom) {
     // 验证一组参数：与默认参数在同一批牌局上配对比较
     const rounds = arg('--rounds', 20000);
-    const base = await runPolicy('v2', rounds, jobs);
+    // 对照组默认用默认参数，也可以用 --base '{...}' 指定
+    const bi = process.argv.indexOf('--base');
+    const baseParams =
+      bi >= 0 ? (JSON.parse(process.argv[bi + 1]) as DeepPartial<ScCoachParams>) : undefined;
+    const base = await runPolicy('v2', rounds, jobs, baseParams);
     const tuned = await runPolicy('v2', rounds, jobs, custom);
-    console.log(summary('v2 默认', base));
+    console.log(summary(`v2 ${baseParams ? JSON.stringify(baseParams) : '默认'}`, base));
     console.log(summary(`v2 ${JSON.stringify(custom)}`, tuned));
     console.log(`调参 − 默认：每盘 ${paired(tuned, base)}`);
     return;

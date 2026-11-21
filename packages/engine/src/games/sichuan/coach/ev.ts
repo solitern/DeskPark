@@ -127,7 +127,7 @@ export function buildEnv(v: ScView, params: ScCoachParams): Env {
   const tEff = T * (1 + params.kappa * nOpp);
   const rz = 1 / (1 + params.kappa * nOpp);
   const opps = opponentsOf(v, me, params);
-  const { risk, dealIn } = riskTable(opps, base, params, v.myAfterKong);
+  const { risk, dealIn } = riskTable(opps, base, params, v.myAfterKong, T, rz);
   let rs = 0;
   for (let k = 0; k < KINDS; k++) rs += left[k] * risk[k];
   return {
